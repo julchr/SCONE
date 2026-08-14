@@ -9,7 +9,7 @@ module noAcceleration_class
   use publicObjects,                only : coordData, intersectionTestPayload, intersectionTestResult, &
                                            newIntersectionTestPayload, newRationalIntersectionTestPayload, &
                                            rationalIntersectionTestPayload
-  use ratint
+  use ratint_mod
   use topologicalObject_inter,      only : topologicalObjectBox
   use topologicalObjectShelf_class, only : topologicalObjectShelf
   use universalVariables,           only : INF, INSIDE_ELEMENT, NUDGE, ON_BOUNDARY_ELEMENT, OUTSIDE_ELEMENT, VALENCE

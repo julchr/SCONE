@@ -10,7 +10,7 @@ add_sources(
             ./dictParser_func.f90
             ./dynArray_class.f90
             ./limb_class.f90
-            ./ratint_class.f90
+            ./ratint_mod.f90
             ./stack_class.f90
            )
 

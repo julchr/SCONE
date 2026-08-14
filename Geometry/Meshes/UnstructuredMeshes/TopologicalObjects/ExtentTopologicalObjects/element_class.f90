@@ -10,7 +10,7 @@ module element_class
   use numPrecision
   use publicObjects,                 only : basicElementInfo, intersectionTestPayload, intersectionTestResult, &
                                             resetIntersectionTestResult
-  use ratint
+  use ratint_mod
   use RNG_class,                     only : RNG
   use topologicalObject_inter,       only : buildTopologicalObjectPayload, kill_super => kill, topologicalObject, &
                                             topologicalObjectBox

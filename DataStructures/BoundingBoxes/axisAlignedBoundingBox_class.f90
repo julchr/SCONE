@@ -2,7 +2,9 @@ module axisAlignedBoundingBox_class
 
   use genericProcedures,  only : anyAreEqual, areEqual, swap
   use numPrecision
-  use publicObjects,      only : intersectionTestPayload, intersectionTestResult, resetIntersectionTestResult
+  use publicObjects,      only : intersectionTestPayload, intersectionTestResult, &
+                                 newRationalIntersectionTestPayload, rationalIntersectionTestPayload
+  use ratint_mod
   use universalVariables, only : INF, NUDGE, ONE, SURF_TOL, ZERO
 
   implicit none
@@ -13,8 +15,9 @@ module axisAlignedBoundingBox_class
   !!
   type, public :: axisAlignedBoundingBox
     private
-    real(defReal), dimension(3, 2) :: bounds = ZERO
-    real(defReal), dimension(3)    :: centre = ZERO, halfwidths = ZERO
+    real(defReal), dimension(3)     :: centre = ZERO, halfwidths = ZERO
+    real(defReal), dimension(3, 2)  :: bounds = ZERO
+    type(ratint_t), dimension(3, 2) :: rationalBounds
   contains
     ! Build procedure.
     procedure          :: init
@@ -31,9 +34,10 @@ module axisAlignedBoundingBox_class
     procedure          :: getBounds
     procedure          :: getCentre
     procedure          :: getHalfwidths
-    generic            :: intersects => intersects_BoundingBox, intersects_Ray
+    generic            :: intersects => intersects_BoundingBox, intersects_Ray, intersects_Ray_rational
     procedure, private :: intersects_BoundingBox
     procedure, private :: intersects_Ray
+    procedure, private :: intersects_Ray_rational
     procedure          :: pushFromBoundary
   end type axisAlignedBoundingBox
 
@@ -198,58 +202,150 @@ contains
     self % centre = HALF * (bounds(:, 1) + bounds(:, 2))
     self % halfwidths = HALF * (bounds(:, 2) - bounds(:, 1))
 
+    ! Pre-compute rational bounds.
+    self % rationalBounds(:, 1) = convert_ieee(self % bounds(:, 1))
+    self % rationalBounds(:, 2) = convert_ieee(self % bounds(:, 2))
+
   end subroutine init
 
   !!
   !!
   !!
-  elemental subroutine intersects_BoundingBox(self, boundingBox, doesIt)
+  elemental function intersects_BoundingBox(self, boundingBox) result(doesIt)
     class(axisAlignedBoundingBox), intent(in) :: self
     type(axisAlignedBoundingBox), intent(in)  :: boundingBox
-    logical(defBool), intent(out)             :: doesIt
+    logical(defBool)                          :: doesIt
 
     doesIt = all(self % bounds(:, 1) <= boundingBox % bounds(:, 2)) .and. all(boundingBox % bounds(:, 1) <= self % bounds(:, 2))
 
-  end subroutine intersects_BoundingBox
+  end function intersects_BoundingBox
 
   !!
   !!
   !!
-  subroutine intersects_Ray(self, payload, result)
-    class(axisAlignedBoundingBox), intent(in)    :: self
-    class(intersectionTestPayload), intent(in)   :: payload
-    class(intersectionTestResult), intent(inout) :: result
-    real(defReal)                                :: d, inverseU, tFar, tNear, t1, t2
-    integer(shortInt)                            :: i
+  pure function intersects_Ray(self, payload) result(res)
+    class(axisAlignedBoundingBox), intent(in)  :: self
+    class(intersectionTestPayload), intent(in) :: payload
+    integer(shortInt)                          :: i
+    real(defReal)                              :: inverseU, tFar, tNear, t1, t2
+    type(intersectionTestResult)               :: res
 
-    ! Initialise d = INF then loop over all halfwidths.
+    ! Initialise tNear = -INF, tFar = INF, then loop over all halfwidths.
     tNear = -INF
     tFar = INF
-    call resetIntersectionTestResult(result)
 
     do i = 1, 3
-      if (areEqual(payload % u(i), ZERO)) then
-        if (payload % r(i) < self % bounds(i, 1) .or. self % bounds(i, 2) < payload % r(i)) return
+      if(areEqual(payload % u(i), ZERO)) then
+        if(areEqual(payload % r(i), self % bounds(i, 1)) .or. &
+           areEqual(payload % r(i), self % bounds(i, 2))) then
+          ! If ray is parallel to current dimension and is within tolerance of either plane of the
+          ! bounding box along the current dimension, launch exact computation and return.
+          res = self % intersects_ray_rational(newRationalIntersectionTestPayload(convert_ieee(payload % r), &
+                                                                                  convert_ieee(payload % u), &
+                                                                                  convert_ieee(payload % dMax)))
+          return
+
+        end if
+        ! If ray is parallel and is definitely outside the box, there can be no intersection so return early.
+        ! Else, cycle to the next dimension.
+        if(payload % r(i) < self % bounds(i, 1) .or. self % bounds(i, 2) < payload % r(i)) return
+        cycle
 
       else
         inverseU = ONE / payload % u(i)
         t1 = (self % bounds(i, 1) - payload % r(i)) * inverseU
         t2 = (self % bounds(i, 2) - payload % r(i)) * inverseU
-        if (t2 < t1) call swap(t1, t2)
+        if(t2 < t1) call swap(t1, t2)
 
         tNear = max(tNear, t1)
         tFar = min(tFar, t2)
-        if (tFar < tNear .or. tFar < SURF_TOL) return
+
+        ! Return early if intersection is impossible (far intersection is definitely greater than near intersection, or far
+        ! intersection is definitely negative).
+        if((tFar < tNear .and. .not. areEqual(tNear, tFar)) .or. &
+           (tFar < ZERO .and. .not. areEqual(tFar, ZERO))) return
 
       end if
 
     end do
 
-    d = merge(tFar, tNear, tNear < SURF_TOL)
-    result % intersects = .true.
-    result % d = d
+    ! If results are ambiguous, launch an exact computation.
+    if(areEqual(tNear, ZERO) .or. areEqual(tFar, ZERO) .or. areEqual(tNear, tFar)) then
+      res = self % intersects_ray_rational(newRationalIntersectionTestPayload(convert_ieee(payload % r), &
+                                                                              convert_ieee(payload % u), &
+                                                                              convert_ieee(payload % dMax)))
+      ! TODO: change this; needs exact computed distance. Do this when reworking acceleration structures.
+      res % d = merge(tFar, tNear, tNear < ZERO)
 
-  end subroutine intersects_Ray
+    else
+      res % d = merge(tFar, tNear, tNear < ZERO)
+      res % intersects = .true.
+
+    end if
+
+  end function intersects_Ray
+
+  !!
+  !!
+  !!
+  pure function intersects_ray_rational(self, payload) result(res)
+    class(axisAlignedBoundingBox), intent(in)         :: self
+    type(rationalIntersectionTestPayload), intent(in) :: payload
+    integer(shortInt)                                 :: i
+    logical(defBool)                                  :: areDistancesInvalid
+    type(intersectionTestResult)                      :: res
+    type(ratint_t)                                    :: temp, tFar, tNear, t1, t2, ZERO_rational
+
+    ! Pre-compute ZERO_rational.
+    ZERO_rational = convert_int(0_longInt)
+
+    ! Initialise areDistancesInvalid = .true. then loop over all dimensions.
+    areDistancesInvalid = .true.
+    do i = 1, 3
+      ! Check if ray is parallel to the current dimension.
+      if(isZero(payload % u(i))) then
+        ! If ray starts outside the box simply return, else cycle to the next dimension.
+        if(self % rationalBounds(i, 1) > payload % r(i) .or. &
+           payload % r(i) > self % rationalBounds(i, 2)) return
+        cycle
+
+      end if
+
+      ! Compute t1 and t2.
+      t1 = (self % rationalBounds(i, 1) - payload % r(i)) / payload % u(i)
+      t2 = (self % rationalBounds(i, 2) - payload % r(i)) / payload % u(i)
+
+      ! Swap if necessary.
+      if(t1 > t2) then
+        temp = t1
+        t1 = t2
+        t2 = temp
+
+      end if
+
+      ! Update values.
+      if(areDistancesInvalid) then
+        tNear = t1
+        tFar = t2
+
+        ! Update flag.
+        areDistancesInvalid = .false.
+
+      else
+        if(t1 > tNear) tNear = t1
+        if(tFar > t2) tFar = t2
+
+      end if
+
+      ! Return early if crossing is impossible.
+      if(tNear > tFar .or. ZERO_rational > tFar) return
+
+    end do
+
+    ! If reached, the ray intersects the bounding box.
+    res % intersects = .true.
+
+  end function intersects_ray_rational
 
   !!
   !!

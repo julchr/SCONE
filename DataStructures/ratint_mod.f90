@@ -1,4 +1,4 @@
-module ratint
+module ratint_mod
     
   use limb_class
   use numPrecision
@@ -742,7 +742,7 @@ module ratint
 
   end function dot_product_ratint
 
-end module
+end module ratint_mod
 
 
 

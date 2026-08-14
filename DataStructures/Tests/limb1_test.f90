@@ -2,7 +2,7 @@ module limb1_test
     use numPrecision
     use funit
     use limb_class
-    use ratint
+    use ratint_mod
     use, intrinsic :: iso_fortran_env
     use, intrinsic :: ieee_arithmetic
 

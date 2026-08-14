@@ -347,7 +347,7 @@ contains
     else
       ! Compute the intersection between the ray and the root node's bounding box.
       boundingBoxPtr => self % getBoundingBoxPtr()
-      call boundingBoxPtr % intersects(newIntersectionTestPayload(data % r, data % u, data % dMax), boundingBoxIntersectionResult)
+      boundingBoxIntersectionResult = boundingBoxPtr % intersects(newIntersectionTestPayload(data % r, data % u, data % dMax))
       if (.not. boundingBoxIntersectionResult % intersects) return
 
       ! At this point, the ray intersects the bounding box. Nudge intersection coordinates slightly
@@ -383,7 +383,7 @@ contains
 
       ! Retrieve the leaf's bounding box and compute the distance to exit.
       boundingBoxPtr => leafPtr % getBoundingBoxPtr()
-      call boundingBoxPtr % intersects(newIntersectionTestPayload(rCurrent, data % u, dMax), boundingBoxIntersectionResult)
+      boundingBoxIntersectionResult = boundingBoxPtr % intersects(newIntersectionTestPayload(rCurrent, data % u, dMax))
 
       ! Retrieve all contained objects within the leaf and test them all for an intersection.
       dTravelled = dTravelled + boundingBoxIntersectionResult % d

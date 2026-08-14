@@ -6,7 +6,7 @@ module genericProcedures
   use numPrecision
   use openmp_func,       only : ompGetMaxThreads
   use universalVariables
-  use ratint
+  use ratint_mod
 
   implicit none
 
