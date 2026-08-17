@@ -1,11 +1,13 @@
 module box_class
 
-  use numPrecision
-  use universalVariables
-  use genericProcedures,     only : append, fatalError, numToChar, areEqual
-  use dictionary_class,      only : dictionary
-  use surface_inter,         only : kill_super => kill
   use compoundSurface_inter, only : compoundSurface
+  use dictionary_class,      only : dictionary
+  use errors_mod,            only : fatalError
+  use genericProcedures,     only : append, areEqual, numToChar, swap
+  use numPrecision
+  use ratint_mod,            evaluate_ratint => evaluate
+  use surface_inter,         only : kill_super => kill
+  use universalVariables,    only : INF
 
   implicit none
   private
@@ -37,18 +39,19 @@ module box_class
   !!
   type, public, extends(compoundSurface) :: box
     private
-    integer(shortInt)                    :: nBCs = 6
+    integer(shortInt) :: nBCs = 6
   contains
     ! Superclass procedures.
-    procedure                            :: cropsBoundingBox
-    procedure                            :: init
-    procedure                            :: evaluate
-    procedure                            :: distance
-    procedure                            :: entersPositiveHalfspace
-    procedure                            :: kill
-    procedure                            :: setBCs
-    procedure                            :: explicitBC
-    procedure                            :: transformBC
+    procedure          :: cropsBoundingBox
+    procedure          :: init
+    procedure          :: evaluate
+    procedure          :: distance
+    procedure, private :: distance_rational
+    procedure          :: entersPositiveHalfspace
+    procedure          :: kill
+    procedure          :: setBCs
+    procedure          :: explicitBC
+    procedure          :: transformBC
   end type box
 
 contains
@@ -133,16 +136,154 @@ contains
 
   end function evaluate
 
-  
+  !!
+  !!
+  !!
   pure function distance(self, r, u) result(d)
     class(box), intent(in)                  :: self
     real(defReal), dimension(3), intent(in) :: r, u
-    real(defReal)                           :: d
+    integer(shortInt)                       :: i
+    logical(defBool)                        :: surfTolCondition
+    real(defReal)                           :: d, inverseU, tFar, tNear, t1, t2
+    real(defReal), dimension(3, 2)          :: bounds
     
-    ! Call compoundSurface procedure.
-    d = self % distancesCompound(r, u, -INF, INF, abs(self % evaluate(r)) < self % getSurfTol())
+    ! Initialise d = INF, tNear = -INF, tFar = INF.
+    d = INF
+    tNear = -INF
+    tFar = INF
+
+    surfTolCondition = abs(self % evaluate(r)) < self % getSurfTol()
+
+    ! Retrieve bounds then loop over all dimensions.
+    bounds = self % getBounds()
+
+    do i = 1, 3
+      if((areEqual(r(i), bounds(i, 1)) .or. areEqual(r(i), bounds(i, 2))) .and. areEqual(u(i), ZERO)) then
+        d = self % distance_rational(surfTolCondition, convert_ieee(r), convert_ieee(u))
+        return
+
+      end if
+
+      ! Perform early check to see if the particle is outside the slab and moving away from it along
+      ! the current dimension. If yes the particle cannot intersect the slab and we can return early.
+      if((r(i) <= bounds(i, 1) .and. u(i) <= ZERO) .or. (r(i) >= bounds(i, 2) .and. u(i) >= ZERO)) return
+
+      if(areEqual(u(i), ZERO)) cycle
+      inverseU = ONE / u(i)
+      t1 = (bounds(i, 1) - r(i)) * inverseU
+      t2 = (bounds(i, 2) - r(i)) * inverseU
+      if(t2 < t1) call swap(t1, t2)
+
+      tNear = max(tNear, t1)
+      tFar = min(tFar, t2)
+
+      ! Return early if intersection is impossible (far intersection is definitely greater than near intersection, or far
+      ! intersection is definitely negative).
+      if((tFar < tNear .and. .not. areEqual(tNear, tFar)) .or. &
+          (tFar < ZERO .and. .not. areEqual(tFar, ZERO))) return
+
+    end do
+
+    ! If results are ambiguous, launch an exact computation.
+    if(areEqual(tNear, tFar) .or. &
+       (.not. surfTolCondition .and. (areEqual(tNear, ZERO) .or. areEqual(tFar, ZERO)))) then
+      d = self % distance_rational(surfTolCondition, convert_ieee(r), convert_ieee(u))
+
+    else
+      ! Take the far intersection if the particle is on the surface or already inside it.
+      if((surfTolCondition .and. abs(tFar) >= abs(tNear)) .or. &
+         (.not. surfTolCondition .and. tNear <= ZERO)) then
+        d = tFar
+
+      else
+        d = tNear
+
+      end if
+
+    end if
+
+    ! Cap distance to INF if d <= ZERO or d > INF.
+    if(d <= ZERO .or. d > INF) d = INF
   
   end function distance
+
+  !!
+  !!
+  !!
+  pure function distance_rational(self, surfTolCondition, r, u) result(d)
+    class(box), intent(in)                   :: self
+    logical(defBool), intent(in)             :: surfTolCondition
+    type(ratint_t), dimension(3), intent(in) :: r, u
+    integer(shortInt)                        :: i
+    logical(defBool)                         :: areDistancesInvalid
+    real(defReal)                            :: d
+    type(ratint_t)                           :: temp, tFar, tNear, t1, t2, ZERO_rational
+    type(ratint_t), dimension(3, 2)          :: bounds
+
+    ! Pre-compute ZERO_rational.
+    ZERO_rational = convert_int(0_longInt)
+    
+    ! Initialise areDistancesInvalid = .true. and d = INF.
+    areDistancesInvalid = .true.
+    d = INF
+
+    ! Retrieve bounds then loop over all dimensions.
+    bounds = self % getRationalBounds()
+    do i = 1, 3
+      if((r(i) == bounds(i, 1) .or. r(i) == bounds(i, 2)) .and. isZero(u(i))) return
+
+      ! Perform early check to see if the particle is outside the slab and moving away from it along
+      ! the current dimension. If yes the particle cannot intersect the slab and we can return early.
+      if((bounds(i, 1) >= r(i) .and. ZERO_rational >= u(i)) .or. (r(i) >= bounds(i, 2) .and. u(i) >= ZERO_rational)) return
+
+      if(isZero(u(i))) cycle
+      t1 = (bounds(i, 1) - r(i)) / u(i)
+      t2 = (bounds(i, 2) - r(i)) / u(i)
+
+      ! Swap if necessary.
+      if(t1 > t2) then
+        temp = t1
+        t1 = t2
+        t2 = temp
+
+      end if
+
+      ! Update values.
+      if(areDistancesInvalid) then
+        tNear = t1
+        tFar = t2
+
+        ! Update flag.
+        areDistancesInvalid = .false.
+
+      else
+        if(t1 > tNear) tNear = t1
+        if(tFar > t2) tFar = t2
+
+      end if
+
+      ! Return early if crossing is impossible.
+      if(tNear > tFar .or. ZERO_rational > tFar) return
+
+    end do
+
+    ! Return if distance are still invalid (should never happen for a unit vector).
+    if(areDistancesInvalid) return
+
+    ! Take the far intersection if the particle is on the surface or already inside it.
+    if((surfTolCondition .and. absoluteValue(tFar) >= absoluteValue(tNear)) .or. &
+       (.not. surfTolCondition .and. ZERO_rational >= tNear)) then
+      d = evaluate_ratint(tFar)
+
+    else
+      d = evaluate_ratint(tNear)
+
+    end if
+
+    ! Cap distance to INF if d <= ZERO or d > INF.
+    if(d <= ZERO .or. d > INF) d = INF
+  
+  end function distance_rational
 
   !! Function 'entersPositiveHalfspace'
   !!

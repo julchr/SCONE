@@ -1,0 +1,81 @@
+type eigenPhysicsPackage;
+
+pop      50000;
+cycles   10;
+inactive 10;
+XSdata ce;
+dataType ce;
+seed 3;
+
+collisionOperator { neutronCE {type neutronCEstd;} }
+
+transportOperator { type transportOperatorST; cache 1; }
+
+inactiveTally {}
+
+activeTally {
+	clerks {
+		display (k_eff);
+		k_eff {
+			type keffAnalogClerk;
+		}
+	}
+}
+
+geometry {
+	type geometryStd;
+  	boundary (1 1 1 1 1 1);
+  	graph {type shrunk;}
+
+  	surfaces {
+  		innerBox { id 1; type box; origin (0.0 0.0 0.0); halfwidth (0.5 0.5 0.5); }
+		outerBox { id 2; type box; origin (0.0 0.0 0.0); halfwidth (0.6 0.6 0.6); }
+  	}
+
+	cells {
+		innerCell { id 1; type simpleCell; surfaces (-1); filltype mat; material fuel; }
+		outerCell { id 2; type simpleCell; surfaces (1); filltype mat; material water; }
+  	}
+
+	universes {
+    	root { id 1; type rootUniverse; border 2; fill u<2>; }
+		cells { id 2; type cellUniverse; origin (0.0 0.0 0.0); rotation (0.0 0.0 0.0); cells (1 2); }
+  	}
+
+}
+
+nuclearData {
+	handles {
+    	ce {type aceNeutronDatabase; aceLibrary $SCONE_ACE;}
+  	}
+  
+	materials {
+
+		water {
+      		temp 75675;
+      		rgb (0 0 139); // Colour of water is dark blue
+      		moder { 1001.03 (hh2o.09); }
+      		composition {
+      			type rawAtomicDensities;
+      			nuclides {
+      				1001.03    6.700E-002;
+      				8016.03    3.350E-002;
+      				5010.03    5.560E-006;
+      				5011.03    2.224E-005; 
+      			}
+			}
+      	}
+
+    	fuel {
+      		temp 87476;
+       		composition {
+       			type rawAtomicDensities;
+       			nuclides {
+       				92235.03  1.450E-003;
+      				92238.03  4.690E-002;
+       			}
+			}
+      	}
+	}
+}
+

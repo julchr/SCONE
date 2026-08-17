@@ -244,7 +244,7 @@ contains
     ! Outside within surface tolerance
     r = [ONE, TWO, -2.0_defReal - HALF * SURF_TOL]
     ref = 6.0_defReal + HALF * SURF_TOL
-    @assertEqual(ref, surf % distance(r, u), TOL*ref)
+    @assertEqual(ref, surf % distance(r, u), TOL * ref)
 
     ! ** Inside
     r = [ONE, TWO, -1.0_defReal]

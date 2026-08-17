@@ -11,6 +11,12 @@ module ratint_mod
     type(limb_t) :: p, q
   end type ratint_t
 
+  interface signed
+    module procedure signed_longInt
+    module procedure signed_rational
+    module procedure signed_shortInt
+  end interface signed
+
   interface convert_ieee 
     module procedure convert_ieee64
     module procedure convert_ieee64Vector
@@ -73,6 +79,99 @@ module ratint_mod
   end interface swapSign
   
   contains
+  !! Function 'absoluteValue'
+  !!
+  !! Description:
+  !!   Returns the absolute value of a rational number.
+  !!
+  !! Arguments:
+  !!   r [in] -> Rational number.
+  !!
+  !! Result:
+  !!   res -> Absolute value of r.
+  !!
+  elemental function absoluteValue(r) result(res)
+    type(ratint_t), intent(in) :: r
+    type(ratint_t)             :: res
+
+    ! Copy number then ensure signs are positive.
+    res = r
+    res % p % sign = 1
+    res % q % sign = 1
+
+  end function absoluteValue
+
+  !! Function 'signed_longInt'
+  !!
+  !! Description:
+  !!   Returns |n| with the sign of r.
+  !!
+  !! Arguments:
+  !!   n [in] -> Integer.
+  !!   r [in] -> Rational number.
+  !!
+  !! Result:
+  !!   signedInt -> |n| with sign of r.
+  !!
+  !! Note:
+  !!   Assumes that r1 % q % sign = 1, does not check.
+  !!
+  elemental function signed_longInt(n, r) result(signedInt)
+    integer(longInt), intent(in) :: n
+    type(ratint_t), intent(in)   :: r
+    integer(longInt)             :: signedInt
+
+    signedInt = abs(n) * int(r % p % sign, longInt)
+
+  end function signed_longInt
+
+  !! Function 'signed_rational'
+  !!
+  !! Description:
+  !!   Returns |r1| with the sign of r2.
+  !!
+  !! Arguments:
+  !!   r1 [in] -> Rational number.
+  !!   r2 [in] -> Rational number.
+  !!
+  !! Result:
+  !!   res -> r1 with sign of r2.
+  !!
+  !! Note:
+  !!   Assumes that r1 % q % sign = 1 and r2 % q % sign = 1, does not check.
+  !!
+  elemental function signed_rational(r1, r2) result(res)
+    type(ratint_t), intent(in) :: r1, r2
+    type(ratint_t)             :: res
+
+    res = absoluteValue(r1)
+    res % p % sign = r2 % p % sign
+
+  end function signed_rational
+
+  !! Function 'signed_shortInt'
+  !!
+  !! Description:
+  !!   Returns |n| with the sign of r.
+  !!
+  !! Arguments:
+  !!   n [in] -> Integer.
+  !!   r [in] -> Rational number.
+  !!
+  !! Result:
+  !!   signedInt -> n with sign of r.
+  !!
+  !! Note:
+  !!   Assumes that r % q % sign = 1, does not check.
+  !!
+  elemental function signed_shortInt(n, r) result(signedInt)
+    integer(shortInt), intent(in) :: n
+    type(ratint_t), intent(in)    :: r
+    integer(shortInt)             :: signedInt
+
+    signedInt = abs(n) * r % p % sign
+
+  end function signed_shortInt
 
   !! Enforces the denominator to always be positive by moving any negative
   !! sign into the numerator. All comparison operators cross-multiply by q 
@@ -152,74 +251,67 @@ module ratint_mod
       
   end subroutine swapSign_vector
 
-  
-  pure function convert_ieee64(n) result(r)
-      real(defReal), intent(in) :: n 
-      type(ratint_t) :: r 
-      real(defReal) :: n1
-      integer(longInt) :: i, shift
+  !! Function 'twoToThePower'
+  !!
+  !! Basic description:
+  !!   Returns 2 ** n as a limb number, for 0 <= n. Never computes 2 ** n directly. The base of an integer literal is a default
+  !!   integer, so the result overflows for 31 <= n whatever the kind of n. Here 2 ** n = 2 ** (31 * j + s) is built as 2 ** s 
+  !!   shifted up by j whole limbs, with s < 31 so the remaining power is safe.
+  !!
+  pure function twoToThePower(n) result(l)
+    integer(shortInt), intent(in) :: n
+    type(limb_t)                  :: l
 
-      real(defReal) :: frac, exp
-      type(ratint_t) :: expratint, fracratint
+    l = shiftbyn(initlimb(2_longInt ** mod(n, 31)), n / 31)
 
-      !print *, n
-      frac = fraction(n)
-      exp = exponent(n)
+  end function twoToThePower
 
+  !! Function 'convert_ieee64'
+  !!
+  !! Basic description:
+  !!   Converts a double precision number into an exact rational.
+  !!
+  !! Detailed description:
+  !!   Every double is exactly mantissa * 2 ** exponentOfTwo with mantissa an integer of
+  !!   at most 53 bits, so the conversion is lossless and needs no search over bits.
+  !!
+  pure function convert_ieee64(n) result(res)
+    real(defReal), intent(in) :: n
+    integer(longInt)          :: mantissa
+    integer(shortInt)         :: exponentOfTwo
+    type(ratint_t)            :: res
 
-      shift = 0
+    ! Handle zero.
+    if(n == ZERO) then
+      call setZero(res)
+      return
 
+    end if
 
-      
-      do i=0, 52
+    ! Decompose into an integer mantissa and a binary exponent.
+    mantissa = int(scale(fraction(abs(n)), 53), longInt)
+    exponentOfTwo = exponent(n) - 53
 
-          if (int(frac, 8)*1_defReal == frac) then 
-              shift = i 
-              exit 
-          end if 
-          shift = i+1
+    ! Strip trailing zero bits to keep the denominator as small as possible.
+    do while(iand(mantissa, 1_longInt) == 0_longInt)
+      mantissa = shiftr(mantissa, 1)
+      exponentOfTwo = exponentOfTwo + 1
 
-          frac = frac * 2
-      end do
-    
-      
-      ! Simplification based on powers of 2
-      if (exp > 0) then 
-          if (exp >= shift) then 
-              exp = exp - shift 
-              shift = 0 
-          else 
-              shift = shift - exp 
-              exp = 0 
-          end if 
-      end if
+    end do
 
+    ! Assemble the rational.
+    if(exponentOfTwo < 0) then
+      res % p = initlimb(mantissa)
+      res % q = twoToThePower(-exponentOfTwo)
 
-      fracratint%p = initlimb(int(frac, 8)*1_8) 
-      fracratint%q = initlimb(2**shift)
+    else
+      res % p = initlimb(mantissa) * twoToThePower(exponentOfTwo)
+      res % q = initlimb(1_longInt)
 
-      
+    end if
 
-      ! print * , sign(1, floor(exp))
-      if (exp < 0) then 
-          expratint%p = initlimb(1_8)
-          expratint%q = initlimb(2**int(abs(floor(exp)), 8))
-      else 
-
-          expratint%p = initlimb(2**int(exp, 8))
-          expratint%q = initlimb(1_8)
-      end if 
-
-
-
-      r = expratint * fracratint
-
-      if (sign(1.0_defReal,n) == -1.0_defReal) then 
-          r%p%sign = -1
-      end if
-
-
-
+    ! Apply the sign.
+    if(n < ZERO) res % p % sign = -1
 
   end function convert_ieee64
 
@@ -261,16 +353,11 @@ module ratint_mod
 
   end subroutine setInvalidRatint
 
-  pure function isZero_flat(r) result(x)
-      type(ratint_t), intent(in) :: r 
-      logical :: x
+  elemental function isZero_flat(r) result(isIt)
+    type(ratint_t), intent(in) :: r 
+    logical(defBool)           :: isIt
 
-      x = .false.
-
-      if (limbiszero(r%p)) then 
-          x = .true.
-          return 
-      end if 
+    isIt = limbiszero(r % p)
 
   end function isZero_flat
 
@@ -494,14 +581,19 @@ module ratint_mod
   ! Follows keep, change, flip rule, then applies multiplication
   ! NOTE: division by 0 causes NaN via modulo() call in gcd
 
-  elemental type(ratint_t) function dividepure(r1,r2)
-    type(ratint_t), intent(in) :: r1,r2 
-    type(ratint_t) :: r3
-    type(limb_t) :: temp 
+  elemental type(ratint_t) function dividepure(r1, r2)
+    type(ratint_t), intent(in) :: r1, r2
+    type(ratint_t)             :: r3
 
-    temp = r2%p 
-    r3%p = r2%q 
-    r3%q = temp 
+    ! Handle division by 0.
+    if(isZero(r2)) then
+      call setInvalidRatint(dividepure)
+      return
+
+    end if
+
+    r3 % p = r2 % q 
+    r3 % q = r2 % p 
 
     dividepure = multiplypure(r1, r3)
 
@@ -550,71 +642,6 @@ module ratint_mod
       rout%q = rin%q
 
   end subroutine assignpure
-
-  
-  ! Simplifies the input via the gcd method
-  pure function simplify(r) result(rs)
-      type(ratint_t), intent(in) ::  r 
-      type(ratint_t) :: rs 
-      type(limb_t) :: rp 
-      type(limb_t)  :: rq 
-      type(limb_t) :: gcdval
-
-
-      rp = r%p 
-      rq = r%q
-
-      ! Gets gcd between numerator and denominator (p,q)
-      gcdval = gcd(rp, rq)
-      ! division by zero check
-      if (limbiszero(gcdVal)) then 
-          rs%p = initlimb4(0)
-          rs%q = initlimb4(0)
-      else
-          ! Sets the new numerator and denominator 
-          rp = initlimb4(floor(rp / gcdVal))
-          rq = initlimb4(floor(rq / gcdVal))
-
-
-          rs%p = rp 
-          rs%q = rq
-      end if 
-
-
-  end function simplify
-
-
-
-
-
-  ! gcd via modulus version as all numerator/denominator are positive
-  pure function gcd (a,b) result(v)
-      type(limb_t), intent(in) :: a,b
-      type(limb_t) :: at, bt
-      integer(shortInt) :: temp
-      type(limb_t) :: v
-      integer(shortInt) :: asign, bsign 
-
-      at = a 
-      bt = b
-
-      at%sign = 1
-      bt%sign = 1
-
-
-      do while (.not. (at == bt))
-
-          if (at > bt) then 
-              at = at - bt 
-          else 
-              bt = bt - at
-          end if 
-      end do 
-
-      v = at 
-      
-  end function gcd
-
 
   pure function equality(a, b) result(r)
       type(ratint_t), intent(in) :: a,b 
