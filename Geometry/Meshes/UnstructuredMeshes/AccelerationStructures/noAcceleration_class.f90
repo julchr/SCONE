@@ -141,7 +141,7 @@ contains
     type(coordData), intent(inout)                     :: data
     integer(shortInt), intent(out)                     :: nIntersectedFaces
     integer(shortInt), dimension(VALENCE), intent(out) :: intersectedFaceIdxs
-    integer(shortInt)                                  :: faceIdx, i, j
+    integer(shortInt)                                  :: faceIdx, i
     type(faceBox)                                      :: testFace
     type(intersectionTestResult)                       :: intersectionResult
     type(ratint_t)                                     :: d

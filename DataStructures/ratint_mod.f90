@@ -404,32 +404,38 @@ module ratint_mod
 
   end function evaluate
 
-
-  elemental type(ratint_t) function addpure(r1, r2)
+  elemental function addpure(r1, r2) result(res)
     type(ratint_t), intent(in) :: r1, r2
-    type(ratint_t)             :: r1t, r2t
-    type(ratint_t)             :: r3
+    integer(shortInt)          :: n
+    type(ratint_t)             :: res
 
     if(checkInvalidRatint(r1) .or. checkInvalidRatint(r2)) then 
-      call setInvalidRatint(r3)
-      addpure = r3
+      call setInvalidRatint(res)
       return
 
     end if
 
-    ! Modify numerators so that denominators are the same
-    ! NOTE: Because of lcm calculation this is guaranteed to be a whole number
-    r1t%p = r1%p * r2%q
-    r2t%p = r2%p * r1%q
+    ! Check if both r1 and r2 have the same denominator.
+    if(r1 % q == r2 % q) then
+      res % p = r1 % p + r2 % p
+      res % q = r1 % q
 
-    r3%p = r1t%p + r2t%p
+    else
+      res % p = r1 % p * r2 % q + r2 % p * r1 % q
+      res % q = r1 % q * r2 % q
 
-    ! Sets the denominator to be the lowest common multiple
-    r3%q = r1%q * r2%q 
-    addpure = r3
+      ! Strip common factors of two.
+      n = min(trailingZeroBits(res % p), trailingZeroBits(res % q))
+      if(0 < n) then
+        call shiftRightBits(res % p, n)
+        call shiftRightBits(res % q, n)
+
+      end if
+
+    end if
 
     ! Normalise signs.
-    call normaliseSign(addpure)
+    call normaliseSign(res)
 
   end function addpure
 
@@ -498,24 +504,30 @@ module ratint_mod
 
   
   !! multiplies numerator and denominator then simplifies the fraction
-  elemental type(ratint_t) function multiplypure(r1, r2)
-    type(ratint_t), intent(in) :: r1, r2 
-    type(ratint_t) :: r3 
+  elemental function multiplypure(r1, r2) result(res)
+    type(ratint_t), intent(in) :: r1, r2
+    integer(shortInt)          :: n
+    type(ratint_t)             :: res
 
-    if (checkInvalidRatint(r1) .or. checkInvalidRatint(r2)) then 
-      call setInvalidRatint(r3)
-      multiplypure = r3
+    if(checkInvalidRatint(r1) .or. checkInvalidRatint(r2)) then 
+      call setInvalidRatint(res)
       return
 
     end if 
 
-    r3%p = r1%p * r2%p 
-    r3%q = r1%q * r2%q
+    res % p = r1 % p * r2 % p 
+    res % q = r1 % q * r2 % q
 
-    multiplypure = r3
+    ! Strip common factors of two.
+    n = min(trailingZeroBits(res % p), trailingZeroBits(res % q))
+    if(0 < n) then
+      call shiftRightBits(res % p, n)
+      call shiftRightBits(res % q, n)
+
+    end if
 
     ! Normalise signs.
-    call normaliseSign(multiplypure)
+    call normaliseSign(res)
 
   end function multiplypure
 

@@ -109,6 +109,57 @@ module limb_class
 
     end function initlimbSize
 
+    !! Returns the number of trailing zero bits, or 0 for a zero number.
+    pure function trailingZeroBits(a) result(n)
+      type(limb_t), intent(in) :: a
+      integer(shortInt)        :: n, i
+
+      n = 0
+      do i = 1, a % front
+        if(a % limbs(i) /= 0) then
+          n = 31 * (i - 1) + trailz(a % limbs(i))
+          return
+
+        end if
+
+      end do
+
+    end function trailingZeroBits
+
+    !! Shifts a limb number right by n bits, whole limbs first then the remainder.
+    pure subroutine shiftRightBits(a, n)
+      type(limb_t), intent(inout)   :: a
+      integer(shortInt), intent(in) :: n
+      integer(shortInt)             :: i, carry, limbShift, bitShift
+
+      limbShift = n / 31
+      bitShift = mod(n, 31)
+
+      ! Drop whole limbs.
+      if(0 < limbShift) then
+        do i = 1, a % front - limbShift
+          a % limbs(i) = a % limbs(i + limbShift)
+
+        end do
+        a % front = max(1, a % front - limbShift)
+
+      end if
+
+      ! Shift the remaining bits, carrying the bottom bits of each limb into the one below.
+      if(0 < bitShift) then
+        do i = 1, a % front - 1
+          carry = iand(a % limbs(i + 1), shiftl(1, bitShift) - 1)
+          a % limbs(i) = ior(shiftr(a % limbs(i), bitShift), shiftl(carry, 31 - bitShift))
+
+        end do
+        a % limbs(a % front) = shiftr(a % limbs(a % front), bitShift)
+
+      end if
+
+      call adjustFront(a)
+
+    end subroutine shiftRightBits
+
     !!
     !!
     !!
@@ -767,18 +818,20 @@ module limb_class
 
       end subroutine karatsubamult
 
-      pure subroutine adjustFront(a)
-          type(limb_t), intent(inout) :: a 
-          integer(shortInt) i
+      pure subroutine adjustFront(l)
+        type(limb_t), intent(inout) :: l 
+        integer(shortInt)           :: i
 
-          do i=a%front,1,-1
-              if (a%limbs(i) /= 0) then 
-                  a%front = i 
-                  return 
-              end if 
-          end do 
+        do i = l % front, 1, -1
+          if(l % limbs(i) /= 0) then
+            l % front = i
+            return
 
-          a%front = 1
+          end if
+
+        end do 
+
+        l % front = 1
 
       end subroutine
 

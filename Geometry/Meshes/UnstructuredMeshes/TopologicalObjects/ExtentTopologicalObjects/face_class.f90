@@ -855,12 +855,9 @@ contains
     class(face), intent(in)                    :: self
     class(intersectionTestPayload), intent(in) :: payload
     class(intersectionTestResult), intent(out) :: result
+    logical(defBool)                           :: isIntersectionPointInside
     real(defReal)                              :: denominator, numerator, t
     real(defReal), dimension(3)                :: firstVertexCoordinates, rIntersection
-
-    ! First check if ray intersects the face's bounding box and return early if not.
-    !call intersects_Ray_super(self, payload, result)
-    !if(.not. result % intersects) return
 
     ! Retrieve the coordinates of the first vertex in the face.
     firstVertexCoordinates = self % getFirstVertexCoordinates()
@@ -878,20 +875,28 @@ contains
     ! Compute distance along the ray to intersection.
     t = numerator / denominator
 
-    ! Escalate to exact computation if the segment either starts or ends within tolerance of the face.
-    if(areEqual(t, ZERO) .or. areEqual(t, payload % dMax)) result % needsRescue = .true.
+    ! If the segment starts on this face and points along its outward normal, the particle is
+    ! leaving through it rather than entering, so there is no intersection.
+    if(areEqual(t, ZERO) .and. ZERO <= denominator) return
 
-    ! Return early if intersection is not possible and the result is unambiguous.
-    if((t < ZERO .or. payload % dMax < t) .and. .not. result % needsRescue) return
-
-    ! Compute intersection point.
+    ! Compute intersection point and check if it is contained inside the face.
     rIntersection = payload % r + payload % u * t
+    isIntersectionPointInside = self % isPointInside(rIntersection)
 
     ! Escalate to exact computation if the intersection point lands within tolerance of any edges or vertices.
-    if(self % isPointNearEdgeOrVertex(rIntersection)) result % needsRescue = .true.
+    if(self % isPointNearEdgeOrVertex(rIntersection)) then
+      result % needsRescue = .true.
+
+    elseif(isIntersectionPointInside .and. (areEqual(t, ZERO) .or. areEqual(t, payload % dMax))) then
+      result % needsRescue = .true.
+
+    end if
+
+    ! Return early if the intersection is impossible and the result is unambiguous.
+    if((t < ZERO .or. payload % dMax < t) .and. .not. result % needsRescue) return
 
     ! Check if the intersection point coordinates are inside the face.
-    if(self % isPointInside(rIntersection)) then
+    if(isIntersectionPointInside) then
       result % intersects = .true.
       result % d = t
 
