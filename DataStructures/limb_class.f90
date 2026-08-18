@@ -17,7 +17,7 @@ module limb_class
     integer(shortInt), dimension(0:MAXIMUM_SIZE) :: limbs
   end type limb_t
 
-  interface initlimb 
+  interface initlimb
     module procedure initlimbempty, initlimbnumlong!, initlimbnumshort
   end interface initlimb
 
@@ -294,85 +294,88 @@ module limb_class
 
 
       pure subroutine addOnSign(a,b, asig, bsig, s)
-          type(limb_t), intent(in)      :: a,b 
-          integer(shortInt), intent(in) :: asig, bsig
-          type(limb_t), intent(inout)   :: s
-          integer(longInt)              :: st, zeroIndA, zeroIndB, overflow, borrow, va, vb
-          integer(shortInt)             :: i, maxfront
+        type(limb_t), intent(in)      :: a,b 
+        integer(shortInt), intent(in) :: asig, bsig
+        type(limb_t), intent(inout)   :: s
+        integer(longInt)              :: st, zeroIndA, zeroIndB, overflow, borrow, va, vb
+        integer(shortInt)             :: i, maxfront
 
-          if (a%front == 1977 .and. b%front == 1977 .and. (a%limbs(a%front)*1_8+b%limbs(b%front)*1_8) > 2_8**31) then 
-              call setInvalid(s)
-              return 
+        if(a % front == MAXIMUM_SIZE .and. b % front == MAXIMUM_SIZE .and. &
+           (a % limbs(a % front) * 1_8 + b % limbs(b % front) * 1_8) > 2_8 ** 31) then 
+            call setInvalid(s)
+            return
+            
+        end if
+
+        st = 0
+
+        maxfront = max(a%front, b%front)
+        overflow = 0
+        borrow = 0
+
+
+        zeroIndA = 0
+        zeroIndB = 0
+
+        do i=1, MAXIMUM_SIZE
+          if (i > maxfront .and. overflow == 0) then 
+            s%front = s%front - (1 - min(1_8, st))
+            exit
+
           end if
 
-          st = 0
 
-          maxfront = max(a%front, b%front)
-          overflow = 0
+
+          ! ! Indicator for preventing the use of an index outside of limb size
+          ! zeroIndA = max(min(a%front+1-i, 1), 0)
+          ! zeroIndB = max(min(b%front+1-i, 1), 0)
+
+          ! ! Add components based on sign
+          ! st = (a%limbs(i*zeroInda))*asig + (b%limbs(i*zeroIndb))*bsig + overflow + borrow
+          ! borrow = 0
+
+          if (i > a%front) then 
+              va = 0
+          else 
+              va = a%limbs(i) * asig 
+          end if 
+
+          if (i > b%front) then 
+              vb = 0
+          else 
+              vb = b%limbs(i)*bsig 
+          end if 
+          
+          st = va + vb + overflow + borrow
           borrow = 0
+          
 
-
-          zeroIndA = 0
-          zeroIndB = 0
-
-          do i=1, MAXIMUM_SIZE
-              if (i > maxfront .and. overflow == 0) then 
-                  s%front = s%front - (1 - min(1_8, st))
-                  exit
-              end if
-
-
-
-              ! ! Indicator for preventing the use of an index outside of limb size
-              ! zeroIndA = max(min(a%front+1-i, 1), 0)
-              ! zeroIndB = max(min(b%front+1-i, 1), 0)
-
-              ! ! Add components based on sign
-              ! st = (a%limbs(i*zeroInda))*asig + (b%limbs(i*zeroIndb))*bsig + overflow + borrow
-              ! borrow = 0
-
-              if (i > a%front) then 
-                  va = 0
-              else 
-                  va = a%limbs(i) * asig 
-              end if 
-
-              if (i > b%front) then 
-                  vb = 0
-              else 
-                  vb = b%limbs(i)*bsig 
-              end if 
-              
-              st = va + vb + overflow + borrow
-              borrow = 0
-              
-
-              ! Borrows from above to make the value positive, stores in borrow
-              do while (st < 0) 
-                  borrow = borrow - 1
-                  st = (2_8)**31 + st 
-              end do 
-
-              ! Compute and remove overflow via 31-bit shifting
-              overflow = shiftl(shiftr(st, 31), 31) 
-
-              s%limbs(i) = st - overflow 
-              ! Any overflow is by at most one bit
-              overflow = shiftr(overflow, 31)
-              
-              s%front = i
-              
-              !if (i>=maxfront .and. overflow == 0) then 
-                  ! Covers the case of if the final sum is 0 (prevents leading 0)
-                  ! NOTE: If this doesn't have a max(..., 1) it WILL cause a zero index issue if the sum is 0
-              !    s%front = max(int(i - (1 - min(1_8, st)), 4), 1)
-                !   exit
-              !end if
-              
+          ! Borrows from above to make the value positive, stores in borrow
+          do while (st < 0) 
+              borrow = borrow - 1
+              st = (2_8)**31 + st 
           end do 
 
+          ! Compute and remove overflow via 31-bit shifting
+          overflow = shiftl(shiftr(st, 31), 31) 
 
-          call adjustFront(s)
+          s%limbs(i) = st - overflow 
+          ! Any overflow is by at most one bit
+          overflow = shiftr(overflow, 31)
+          
+          s%front = i
+          
+          !if (i>=maxfront .and. overflow == 0) then 
+              ! Covers the case of if the final sum is 0 (prevents leading 0)
+              ! NOTE: If this doesn't have a max(..., 1) it WILL cause a zero index issue if the sum is 0
+          !    s%front = max(int(i - (1 - min(1_8, st)), 4), 1)
+            !   exit
+          !end if
+            
+        end do 
+
+
+        call adjustFront(s)
 
       end subroutine addOnSign
 
@@ -658,7 +661,7 @@ module limb_class
           ! but this will affect performance
           ! It seems like past numbers beginning with 316... n+m applies (verify later)
 
-          if (a%front + b%front > 1977 .or. (checkInvalid(a) .or. checkInvalid(b))) then 
+          if (a%front + b%front > MAXIMUM_SIZE .or. (checkInvalid(a) .or. checkInvalid(b))) then 
               call setInvalid(p)
               return
           end if
@@ -766,7 +769,8 @@ module limb_class
 
           ! !Recursive step
           ! else
-              if ((asplitend-asplitstart+1)+(bsplitend-bsplitstart+1) > 1977 .or. (checkInvalid(a) .or. checkInvalid(b))) then 
+              if ((asplitend-asplitstart+1)+(bsplitend-bsplitstart+1) > MAXIMUM_SIZE .or. &
+                  (checkInvalid(a) .or. checkInvalid(b))) then 
                   call setInvalid(p)
                   return
               end if
@@ -1290,7 +1294,7 @@ module limb_class
           integer, intent(in) :: n 
           type(limb_t) :: s 
 
-          if (checkInvalid(a) .or. a%front+n > 1977) then 
+          if (checkInvalid(a) .or. a%front+n > MAXIMUM_SIZE) then 
               call setInvalid(s)
               return 
           end if
