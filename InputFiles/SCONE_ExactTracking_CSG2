@@ -1,8 +1,8 @@
 type eigenPhysicsPackage;
 
-pop      20000;
-cycles   150;
-inactive 50;
+pop      5000;
+cycles   45;
+inactive 15;
 XSdata ce;
 dataType ce;
 seed 3;
@@ -40,7 +40,7 @@ geometry {
 	universes {
     	root { id 1; type rootUniverse; border 2; fill u<2>; }
     	cellUniverse { id 2; type cellUniverse; cells (1 2); }
-		fuelPin { id 3; type pinUniverse; radii (0.46955 0.4791 0.5464 0.0); fills (fuel helium cladding water); }
+		fuelPin { id 3; type pinUniverse; radii (0.468587 0.478115 0.545277 0.0); fills (fuel helium cladding water); }
   	}
 
 }
