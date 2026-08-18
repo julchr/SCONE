@@ -1,8 +1,8 @@
 type eigenPhysicsPackage;
 
-pop      50000;
-cycles   10;
-inactive 10;
+pop      5000;
+cycles   45;
+inactive 15;
 XSdata ce;
 dataType ce;
 seed 3;
@@ -28,18 +28,19 @@ geometry {
   	graph {type shrunk;}
 
   	surfaces {
-  		innerBox { id 1; type box; origin (0.0 0.0 0.0); halfwidth (0.5 0.5 0.5); }
-		outerBox { id 2; type box; origin (0.0 0.0 0.0); halfwidth (0.6 0.6 0.6); }
+		pinUniverseContainer { id 1; type box; origin (0.0 0.0 0.0); halfwidth (0.72135 0.72135 0.72135); }
+		outerContainer { id 2; type box; origin (0.0 0.0 0.0); halfwidth (0.75 0.75 0.75); }
   	}
-
-	cells {
-		innerCell { id 1; type simpleCell; surfaces (-1); filltype mat; material fuel; }
-		outerCell { id 2; type simpleCell; surfaces (1); filltype mat; material water; }
+  	
+  	cells {
+  		fuelPinUniverseCell { id 1; type simpleCell; surfaces (-1); filltype uni; universe 3; }
+  		waterCell { id 2; type simpleCell; surfaces (1); filltype mat; material water; }
   	}
 
 	universes {
     	root { id 1; type rootUniverse; border 2; fill u<2>; }
-		cells { id 2; type cellUniverse; origin (0.0 0.0 0.0); rotation (0.0 0.0 0.0); cells (1 2); }
+    	cellUniverse { id 2; type cellUniverse; cells (1 2); }
+		fuelPin { id 3; type pinUniverse; radii (0.468587 0.478115 0.545277 0.0); fills (fuel helium cladding water); }
   	}
 
 }
@@ -50,9 +51,27 @@ nuclearData {
   	}
   
 	materials {
+		cladding {
+			composition {
+				type massFraction;
+				density 6.55;
+				nuclides {
+					40090.03 1.0;
+				}
+			}
+		
+		}
+		helium {
+			composition {
+				type atomicDensityFraction;
+				density 1.6e-3;
+				nuclides {
+					2004.03 1.0;
+				}
+			}
+		}
 
 		water {
-      		temp 75675;
       		rgb (0 0 139); // Colour of water is dark blue
       		moder { 1001.03 (hh2o.09); }
       		composition {
@@ -67,7 +86,6 @@ nuclearData {
       	}
 
     	fuel {
-      		temp 87476;
        		composition {
        			type rawAtomicDensities;
        			nuclides {

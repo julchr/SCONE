@@ -342,6 +342,10 @@ contains
     if (maxDist < updateData % d) then ! Moves within cell
       ! Move local, register event and return early
       call coords % moveLocal(maxDist, coords % getNesting())
+
+      ! Clear the indices of any mesh faces the coordinates are on.
+      call coords % resetCurrentFaceIdxs()
+
       event = COLL_EV
       return
 

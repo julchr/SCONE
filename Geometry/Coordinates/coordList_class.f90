@@ -81,6 +81,7 @@ module coordList_class
     procedure          :: getUniverseRootId
     procedure          :: moveGlobal
     procedure          :: moveLocal
+    procedure          :: resetCurrentFaceIdxs
     procedure          :: rotate
     procedure          :: setCellIdx
     procedure          :: setCoordinates
@@ -560,6 +561,16 @@ contains
     end do
 
   end subroutine moveLocal
+
+  !!
+  !!
+  !!
+  elemental subroutine resetCurrentFaceIdxs(self)
+    class(coordList), intent(inout) :: self
+
+    call self % lvl % resetCurrentFaceIdxs()
+
+  end subroutine resetCurrentFaceIdxs
 
   !!
   !! Rotate direction of the point
