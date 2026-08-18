@@ -307,8 +307,8 @@ contains
     type(intersectionTestResult)             :: result
 
     ! First check if bounding boxes overlap.
-    call boundingBox % intersects(newIntersectionTestPayload(self % vertices(1) % ptr % getCoordinates(), &
-                                                             self % unitEdgeVector, self % length), result)
+    result = boundingBox % intersects(newIntersectionTestPayload(self % vertices(1) % ptr % getCoordinates(), &
+                                                                 self % unitEdgeVector, self % length))
     doesIt = result % intersects
 
   end subroutine intersects_BoundingBox

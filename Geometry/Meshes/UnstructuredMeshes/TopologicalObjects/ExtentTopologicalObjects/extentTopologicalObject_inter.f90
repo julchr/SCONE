@@ -4,7 +4,7 @@ module extentTopologicalObject_inter
   use genericProcedures,            only : fatalError
   use numPrecision
   use publicObjects,                only : intersectionTestPayload, intersectionTestResult
-  use ratint
+  use ratint_mod
   use topologicalObject_inter,      only : buildTopologicalObjectPayload, init_super => init, kill_super => kill, &
                                            topologicalObject
   use universalVariables,           only : INF
@@ -146,7 +146,7 @@ contains
     type(axisAlignedBoundingBox), intent(in)   :: boundingBox
     logical(defBool)                           :: doesIt
 
-    call self % boundingBox % intersects(boundingBox, doesIt)
+    doesIt = self % boundingBox % intersects(boundingBox)
 
   end function intersectsBoundingBox_BoundingBox
 

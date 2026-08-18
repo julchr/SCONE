@@ -5,7 +5,7 @@ module triangulationMethod_inter
   use face_class,                    only : buildFacePayload, faceBox, orientatedFaceBox
   use genericProcedures,             only : fatalError
   use numPrecision
-  use ratint
+  use ratint_mod
   use topologicalObjectShelf_class,  only : topologicalObjectShelf
   use universalVariables,            only : FOURTH, NOT_PRESENT
 

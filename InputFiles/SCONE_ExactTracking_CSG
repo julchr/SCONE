@@ -1,0 +1,99 @@
+type eigenPhysicsPackage;
+
+pop      5000;
+cycles   45;
+inactive 15;
+XSdata ce;
+dataType ce;
+seed 3;
+
+collisionOperator { neutronCE {type neutronCEstd;} }
+
+transportOperator { type transportOperatorST; cache 1; }
+
+inactiveTally {}
+
+activeTally {
+	clerks {
+		display (k_eff);
+		k_eff {
+			type keffAnalogClerk;
+		}
+	}
+}
+
+geometry {
+	type geometryStd;
+  	boundary (1 1 1 1 1 1);
+  	graph {type shrunk;}
+
+  	surfaces {
+		pinUniverseContainer { id 1; type box; origin (0.0 0.0 0.0); halfwidth (0.72135 0.72135 0.72135); }
+		outerContainer { id 2; type box; origin (0.0 0.0 0.0); halfwidth (0.75 0.75 0.75); }
+  	}
+  	
+  	cells {
+  		fuelPinUniverseCell { id 1; type simpleCell; surfaces (-1); filltype uni; universe 3; }
+  		waterCell { id 2; type simpleCell; surfaces (1); filltype mat; material water; }
+  	}
+
+	universes {
+    	root { id 1; type rootUniverse; border 2; fill u<2>; }
+    	cellUniverse { id 2; type cellUniverse; cells (1 2); }
+		fuelPin { id 3; type pinUniverse; radii (0.468587 0.478115 0.545277 0.0); fills (fuel helium cladding water); }
+  	}
+
+}
+
+nuclearData {
+	handles {
+    	ce {type aceNeutronDatabase; aceLibrary $SCONE_ACE;}
+  	}
+  
+	materials {
+		cladding {
+			composition {
+				type massFraction;
+				density 6.55;
+				nuclides {
+					40090.03 1.0;
+				}
+			}
+		
+		}
+		helium {
+			composition {
+				type atomicDensityFraction;
+				density 1.6e-3;
+				nuclides {
+					2004.03 1.0;
+				}
+			}
+		}
+
+		water {
+      		rgb (0 0 139); // Colour of water is dark blue
+      		moder { 1001.03 (hh2o.09); }
+      		composition {
+      			type rawAtomicDensities;
+      			nuclides {
+      				1001.03    6.700E-002;
+      				8016.03    3.350E-002;
+      				5010.03    5.560E-006;
+      				5011.03    2.224E-005; 
+      			}
+			}
+      	}
+
+    	fuel {
+       		composition {
+       			type rawAtomicDensities;
+       			nuclides {
+       				92235.03  1.450E-003;
+      				92238.03  4.690E-002;
+       			}
+			}
+      	}
+	}
+}
+

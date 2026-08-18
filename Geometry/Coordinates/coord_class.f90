@@ -58,6 +58,7 @@ module coord_class
     procedure :: isValid
     procedure :: kill
     procedure :: offsetPosition
+    procedure :: resetCurrentFaceIdxs
     procedure :: rotateComponents
     procedure :: setCellIdx
     procedure :: setDirection
@@ -278,6 +279,17 @@ contains
     self % r = self % r - offset
 
   end subroutine offsetPosition
+
+  !!
+  !!
+  !!
+  elemental subroutine resetCurrentFaceIdxs(self)
+    class(coord), intent(inout) :: self
+
+    self % front = 0
+    self % currentFaceIdxs = 0
+
+  end subroutine resetCurrentFaceIdxs
 
   !!
   !!

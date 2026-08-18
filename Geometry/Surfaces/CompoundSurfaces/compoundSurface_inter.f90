@@ -1,10 +1,11 @@
 module compoundSurface_inter
 
+  use errors_mod,         only : fatalError
   use numPrecision
-  use universalVariables
-  use genericProcedures,  only : fatalError, areEqual, numToChar
-  use universalVariables, only : INF, MISS_TOL
-  use surface_inter,      only : surface, kill_super => kill
+  use genericProcedures,  only : areEqual, numToChar
+  use ratint_mod
+  use surface_inter,      only : kill_super => kill, surface
+  use universalVariables, only : INF, MISS_TOL, PERIODIC_BC, REFLECTIVE_BC, VACUUM_BC
 
   implicit none
   private
@@ -33,19 +34,27 @@ module compoundSurface_inter
   !!
   type, public, abstract, extends(surface)       :: compoundSurface
     private
-    real(defReal), dimension(:), allocatable     :: halfwidths, halfwidthsOrigin
     integer(shortInt)                            :: nHalfwidths = 0
     integer(shortInt), dimension(:), allocatable :: BCs
+    real(defReal), dimension(:), allocatable     :: halfwidths, halfwidthsOrigin
+    real(defReal), dimension(:, :), allocatable  :: bounds
+    type(ratint_t), dimension(:), allocatable    :: rationalHalfwidths, rationalHalfwidthsOrigin
+    type(ratint_t), dimension(:, :), allocatable :: rationalBounds
   contains
-    procedure, non_overridable                   :: distancesCompound
-    procedure, non_overridable                   :: isHalfspacePositive
-    procedure, non_overridable                   :: evaluateCompound
-    procedure, non_overridable                   :: setCompoundBCs
-    procedure, non_overridable                   :: killCompound
-    procedure, non_overridable                   :: getHalfwidths
-    procedure, non_overridable                   :: setHalfwidths
-    procedure, non_overridable                   :: explicitCompoundBCs
-    procedure, non_overridable                   :: transformCompoundBCs
+    procedure          :: distancesCompound
+    generic            :: isHalfspacePositive => isHalfspacePositive_defReal, isHalfSpacePositive_rational
+    procedure, private :: isHalfspacePositive_defReal
+    procedure, private :: isHalfspacePositive_rational
+    procedure          :: evaluateCompound
+    procedure          :: setCompoundBCs
+    procedure          :: killCompound
+    procedure          :: getBounds
+    procedure          :: getHalfwidths
+    procedure          :: getOrigins
+    procedure          :: getRationalBounds
+    procedure          :: setHalfwidths
+    procedure          :: explicitCompoundBCs
+    procedure          :: transformCompoundBCs
   end type compoundSurface
 
 contains
@@ -168,7 +177,7 @@ contains
   !! Result:
   !!   isIt              -> .true. if particle is in positive halfspace.
   !!
-  pure function isHalfspacePositive(self, rComponents, uComponents) result(isIt)
+  pure function isHalfspacePositive_defReal(self, rComponents, uComponents) result(isIt)
     class(compoundSurface), intent(in)                       :: self
     real(defReal), dimension(self % nHalfwidths), intent(in) :: rComponents, uComponents
     logical(defBool)                                         :: isIt
@@ -189,14 +198,12 @@ contains
       dist = abs(offsetCoord) - halfwidth
       if (abs(dist) >= surfTol) cycle
       
-      ! Retrieve direction component for the current dimension. If ray is parallel to current 
-      ! dimension update halfspace based on position.
+      ! Retrieve direction component for the current dimension.
       uComponent = uComponents(i)
       if (areEqual(uComponent, ZERO)) then
-        ! If dist >= ZERO the particle is in the positive halfspace and we can return early. If not
-        ! move onto the next dimension.
-        if (dist >= ZERO) return
-        cycle
+        ! If ray is approximately parallel to current dimension, launch exact computation and return.
+        isIt = self % isHalfspacePositive(convert_ieee(rComponents), convert_ieee(uComponents))
+        return
 
       end if
 
@@ -209,7 +216,63 @@ contains
     ! If reached here, the particle is in the negative halfspace. Update isIt = .false.
     isIt = .false.
 
-  end function isHalfspacePositive
+  end function isHalfspacePositive_defReal
+
+  !!
+  !!
+  !!
+  pure function isHalfspacePositive_rational(self, rComponents, uComponents) result(isIt)
+    class(compoundSurface), intent(in)                        :: self
+    type(ratint_t), dimension(self % nHalfwidths), intent(in) :: rComponents, uComponents
+    integer(shortInt)                                         :: i
+    logical(defBool)                                          :: isIt
+    logical(defBool), dimension(self % nHalfwidths)           :: isOnSurfaces
+    type(ratint_t)                                            :: d, ZERO_rational
+    type(ratint_t), dimension(self % nHalfwidths)             :: offsetCoords
+
+    ! Pre-compute ZERO_rational.
+    ZERO_rational = convert_int(0_longInt)
+
+    ! First check that the point is actually on the surface.
+    isIt = .true.
+    isOnSurfaces = .false.
+    do i = 1, self % nHalfwidths
+      offsetCoords(i) = rComponents(i) - self % rationalHalfwidthsOrigin(i)
+      d = absoluteValue(offsetCoords(i)) - self % rationalHalfwidths(i)
+
+      ! If the distance is positive along any dimension, the point cannot be on the surface so return.
+      if(d > ZERO_rational) return
+
+      ! Check if point is on surface along the current dimension.
+      if(isZero(d)) isOnSurfaces(i) = .true.
+
+    end do
+
+    ! If the point is not on any surfaces here it is in the negative halfspace so return.
+    if(.not. any(isOnSurfaces)) then
+      isIt = .false.
+      return
+
+    end if
+
+    ! Loop over all compound dimensions (note: we need to do this to properly account for particles close to corners).
+    do i = 1, self % nHalfwidths
+      ! If point is not on surface along the current dimension cycle.
+      if(.not. isOnSurfaces(i)) cycle
+      
+      ! If ray is parallel to current dimension the point is considered in the positive halfspace so return.
+      if(isZero(uComponents(i))) return
+
+      ! If reached here, halfspace is given by the sign of the projection of uComponent onto
+      ! halfwidth's normal. Return early if projection > ZERO_rational.
+      if(uComponents(i) * signed(1_longInt, offsetCoords(i)) > ZERO_rational) return
+
+    end do
+
+    ! If reached here, the particle is in the negative halfspace. Update isIt = .false.
+    isIt = .false.
+
+  end function isHalfspacePositive_rational
 
   !! Function 'evaluateCompound'
   !!
@@ -296,11 +359,32 @@ contains
     class(compoundSurface), intent(inout) :: self
 
     self % nHalfwidths = 0
-    if (allocated(self % halfwidths)) deallocate(self % halfwidths)
-    if (allocated(self % halfwidthsOrigin)) deallocate(self % halfwidthsOrigin)
-    if (allocated(self % BCs)) deallocate(self % BCs)
+    if(allocated(self % BCs)) deallocate(self % BCs)
+    if(allocated(self % halfwidths)) deallocate(self % halfwidths)
+    if(allocated(self % halfwidthsOrigin)) deallocate(self % halfwidthsOrigin)
+    if(allocated(self % bounds)) deallocate(self % bounds)
+    if(allocated(self % rationalHalfwidths)) deallocate(self % rationalHalfwidths)
+    if(allocated(self % rationalHalfwidthsOrigin)) deallocate(self % rationalHalfwidthsOrigin)
+    if(allocated(self % rationalBounds)) deallocate(self % rationalBounds)
 
   end subroutine killCompound
+
+  !!
+  !!
+  !!
+  pure function getBounds(self) result(bounds)
+    class(compoundSurface), intent(in)          :: self
+    real(defReal), dimension(:, :), allocatable :: bounds
+
+    if(allocated(self % bounds)) then
+      bounds = self % bounds
+
+    else
+      allocate(bounds(0, 0))
+
+    end if
+
+  end function getBounds
 
   !! Function 'getHalfwidths'
   !!
@@ -317,6 +401,34 @@ contains
     halfwidths = self % halfwidths
 
   end function getHalfwidths
+
+  !!
+  !!
+  !!
+  pure function getOrigins(self) result(origins)
+    class(compoundSurface), intent(in)       :: self
+    real(defReal), dimension(:), allocatable :: origins
+
+    origins = self % halfwidthsOrigin
+
+  end function getOrigins
+
+  !!
+  !!
+  !!
+  pure function getRationalBounds(self) result(rationalBounds)
+    class(compoundSurface), intent(in)           :: self
+    type(ratint_t), dimension(:, :), allocatable :: rationalBounds
+
+    if(allocated(self % rationalBounds)) then
+      rationalBounds = self % rationalBounds
+
+    else
+      allocate(rationalBounds(0, 0))
+
+    end if
+
+  end function getRationalBounds
 
   !! Subroutine 'setHalfwidths'
   !!
@@ -351,6 +463,18 @@ contains
     self % halfwidths = halfwidths
     self % halfwidthsOrigin = origin
     self % nHalfwidths = nHalfwidths
+
+    ! Set rational components.
+    self % rationalHalfwidths = convert_ieee(halfwidths)
+    self % rationalHalfwidthsOrigin = convert_ieee(origin)
+
+    ! Allocate bounds and compute them.
+    allocate(self % bounds(nRequired, 2), self % rationalBounds(nRequired, 2))
+    self % bounds(:, 1) = self % halfwidthsOrigin - self % halfwidths
+    self % bounds(:, 2) = self % halfwidthsOrigin + self % halfwidths
+
+    self % rationalBounds(:, 1) = self % rationalHalfwidthsOrigin - self % rationalHalfwidths
+    self % rationalBounds(:, 2) = self % rationalHalfwidthsOrigin + self % rationalHalfwidths
 
   end subroutine setHalfwidths
 

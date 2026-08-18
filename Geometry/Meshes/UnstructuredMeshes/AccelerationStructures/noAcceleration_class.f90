@@ -9,10 +9,11 @@ module noAcceleration_class
   use publicObjects,                only : coordData, intersectionTestPayload, intersectionTestResult, &
                                            newIntersectionTestPayload, newRationalIntersectionTestPayload, &
                                            rationalIntersectionTestPayload
-  use ratint
+  use ratint_mod
   use topologicalObject_inter,      only : topologicalObjectBox
   use topologicalObjectShelf_class, only : topologicalObjectShelf
-  use universalVariables,           only : INF, INSIDE_ELEMENT, NUDGE, ON_BOUNDARY_ELEMENT, OUTSIDE_ELEMENT, VALENCE
+  use universalVariables,           only : INF, INSIDE_ELEMENT, NUDGE, ON_BOUNDARY_ELEMENT, OUTSIDE_ELEMENT, &
+                                           SURF_TOL, VALENCE
 
   implicit none
   private
@@ -90,7 +91,7 @@ contains
         distances(1) = intersectionResult % d
         dMin = intersectionResult % d
 
-      elseif(areEqual(intersectionResult % d, dMin)) then
+      elseif(abs(intersectionResult % d - dMin) < SURF_TOL) then
         ! If distance to the current face is within tolerance of the best distance found so far,
         ! add the current face to the list of intersected faces.
         nIntersectedFaces = nIntersectedFaces + 1
@@ -141,7 +142,7 @@ contains
     type(coordData), intent(inout)                     :: data
     integer(shortInt), intent(out)                     :: nIntersectedFaces
     integer(shortInt), dimension(VALENCE), intent(out) :: intersectedFaceIdxs
-    integer(shortInt)                                  :: faceIdx, i, j
+    integer(shortInt)                                  :: faceIdx, i
     type(faceBox)                                      :: testFace
     type(intersectionTestResult)                       :: intersectionResult
     type(ratint_t)                                     :: d

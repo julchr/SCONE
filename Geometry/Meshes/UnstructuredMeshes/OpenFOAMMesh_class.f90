@@ -6,9 +6,9 @@ module OpenFOAMMesh_class
   use numPrecision
   use publicObjects,                only : basicEdgeInfo, basicElementInfo, basicFaceInfo, basicVertexInfo, &
                                            meshBoundaryConditionInfo, meshLocalIdInfo
+  use ratint_mod
   use universalVariables,           only : centimetresPerMetre, NOT_PRESENT
   use unstructuredMesh_inter,       only : kill_super => kill, unstructuredMesh
-  use ratint
 
   implicit none
   private

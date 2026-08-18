@@ -7,7 +7,7 @@ module vertex_class
   use topologicalObject_inter,      only : buildTopologicalObjectPayload, kill_super => kill, topologicalObject, &
                                            topologicalObjectBox
   use universalVariables
-  use ratint
+  use ratint_mod
   
   implicit none
   private

@@ -1,7 +1,7 @@
 module publicObjects
 
   use numPrecision
-  use ratint
+  use ratint_mod
   use RNG_class,         only : RNG
   use universalVariables
 

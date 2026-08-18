@@ -10,7 +10,7 @@ module face_class
   use topologicalObject_inter,       only : buildTopologicalObjectPayload, kill_super => kill, topologicalObjectBox
   use universalVariables
   use vertex_class,                  only : vertexBox
-  use ratint
+  use ratint_mod
   
   implicit none
   private
@@ -70,8 +70,8 @@ module face_class
     logical(defBool)                                      :: isBoundary = .false.
     real(defReal)                                         :: area = ZERO
     real(defReal), dimension(N_BC_TYPES)                  :: boundaryValues = ZERO
-    real(defReal), dimension(3)                           :: normal = ZERO
-    type(ratint_t), dimension(3)                          :: ratintNormal
+    real(defReal), dimension(3)                           :: firstVertexCoordinates = ZERO, normal = ZERO
+    type(ratint_t), dimension(3)                          :: firstVertexRationalCoordinates, ratintNormal
     type(edgeBox), dimension(:), allocatable              :: edges
     type(topologicalObjectBox), dimension(:), allocatable :: sharingElements
     type(vertexBox), dimension(:), allocatable            :: vertices
@@ -279,6 +279,11 @@ contains
       end if
 
     end if
+
+    ! Cache the coordinates of the first vertex. Set here rather than in buildComponents, since
+    ! the normal test above may swap the first two vertices.
+    self % firstVertexCoordinates = self % vertices(1) % ptr % getCoordinates()
+    self % firstVertexRationalCoordinates = self % vertices(1) % ptr % getRatintCoordinates()
 
   end subroutine build
 
@@ -640,7 +645,7 @@ contains
     class(face), intent(in)     :: self
     real(defReal), dimension(3) :: firstVertexCoordinates
 
-    firstVertexCoordinates = self % vertices(1) % ptr % getCoordinates()
+    firstVertexCoordinates = self % firstVertexCoordinates
 
   end function getFirstVertexCoordinates
 
@@ -651,7 +656,7 @@ contains
     class(face), intent(in)      :: self
     type(ratint_t), dimension(3) :: firstVertexRationalCoordinates
 
-    firstVertexRationalCoordinates = self % vertices(1) % ptr % getRatintCoordinates()
+    firstVertexRationalCoordinates = self % firstVertexRationalCoordinates
 
   end function getFirstVertexRationalCoordinates
 
@@ -855,18 +860,12 @@ contains
     class(face), intent(in)                    :: self
     class(intersectionTestPayload), intent(in) :: payload
     class(intersectionTestResult), intent(out) :: result
+    logical(defBool)                           :: isIntersectionPointInside
     real(defReal)                              :: denominator, numerator, t
-    real(defReal), dimension(3)                :: firstVertexCoordinates, rIntersection
-
-    ! First check if ray intersects the face's bounding box and return early if not.
-    !call intersects_Ray_super(self, payload, result)
-    !if(.not. result % intersects) return
-
-    ! Retrieve the coordinates of the first vertex in the face.
-    firstVertexCoordinates = self % getFirstVertexCoordinates()
+    real(defReal), dimension(3)                :: rIntersection
 
     ! Compute numerator and denominator.
-    numerator = dot_product(firstVertexCoordinates - payload % r, self % normal)
+    numerator = dot_product(self % firstVertexCoordinates - payload % r, self % normal)
     denominator = dot_product(self % normal, payload % u)
     if(areEqual(denominator, ZERO)) then
       ! If denominator is nearly equal to zero, and the ray lies in the plane of the face, escalate to exact computation.
@@ -878,20 +877,33 @@ contains
     ! Compute distance along the ray to intersection.
     t = numerator / denominator
 
-    ! Escalate to exact computation if the segment either starts or ends within tolerance of the face.
-    if(areEqual(t, ZERO) .or. areEqual(t, payload % dMax)) result % needsRescue = .true.
+    ! If the segment starts on this face and points along its outward normal, the particle is
+    ! leaving through it rather than entering, so there is no intersection.
+    if(areEqual(t, ZERO) .and. ZERO <= denominator) return
 
-    ! Return early if intersection is not possible and the result is unambiguous.
-    if((t < ZERO .or. payload % dMax < t) .and. .not. result % needsRescue) return
+    ! Reject faces whose intersection is unambiguously outside the segment before doing any
+    ! proximity work. Faces within tolerance of either end stay, since their verdict may flip.
+    if((t < ZERO .and. .not. areEqual(t, ZERO)) .or. &
+       (payload % dMax < t .and. .not. areEqual(t, payload % dMax))) return
 
-    ! Compute intersection point.
+    ! Compute intersection point and check if it is contained inside the face.
     rIntersection = payload % r + payload % u * t
+    isIntersectionPointInside = self % isPointInside(rIntersection)
 
     ! Escalate to exact computation if the intersection point lands within tolerance of any edges or vertices.
-    if(self % isPointNearEdgeOrVertex(rIntersection)) result % needsRescue = .true.
+    if(self % isPointNearEdgeOrVertex(rIntersection)) then
+      result % needsRescue = .true.
+
+    elseif(isIntersectionPointInside .and. (areEqual(t, ZERO) .or. areEqual(t, payload % dMax))) then
+      result % needsRescue = .true.
+
+    end if
+
+    ! Return early if the intersection is impossible and the result is unambiguous.
+    if((t < ZERO .or. payload % dMax < t) .and. .not. result % needsRescue) return
 
     ! Check if the intersection point coordinates are inside the face.
-    if(self % isPointInside(rIntersection)) then
+    if(isIntersectionPointInside) then
       result % intersects = .true.
       result % d = t
 
@@ -907,17 +919,13 @@ contains
     class(rationalIntersectionTestPayload), intent(in) :: payload
     class(intersectionTestResult), intent(out)         :: result
     type(ratint_t)                                     :: denominator, t
-    type(ratint_t), dimension(3)                       :: firstVertexCoordinates
-
-    ! Retrieve the coordinates of the first vertex in the face.
-    firstVertexCoordinates = self % getFirstVertexRationalCoordinates()
 
     ! Compute denominator.
     denominator = dot_product(self % ratintNormal, payload % u)
     if(isZero(denominator)) return
 
     ! Compute distance along the ray to intersection.
-    t = dot_product(firstVertexCoordinates - payload % r, self % ratintNormal) / denominator
+    t = dot_product(self % firstVertexRationalCoordinates - payload % r, self % ratintNormal) / denominator
 
     ! Return early if intersection is not possible.
     if((convert_int(0_longInt) > t .or. t > payload % dMax)) return
@@ -982,7 +990,7 @@ contains
     logical(defBool)                         :: isIt
     integer(shortInt)                        :: i, nVertices
     type(ratint_t)                           :: dotProduct, ZERO_rational
-    type(ratint_t), dimension(3)             :: firstVertexCoords, nextVertexCoords, vertexCoords
+    type(ratint_t), dimension(3)             :: nextVertexCoords, vertexCoords
 
     ! Pre-compute ZERO_rational.
     ZERO_rational = convert_int(0_longInt)
@@ -992,8 +1000,7 @@ contains
     nVertices = size(self % vertices)
 
     ! Retrieve the coordinates of the first vertex and initialise vertexCoords = firstVertexCoords.
-    firstVertexCoords = self % vertices(1) % ptr % getRatintCoordinates()
-    vertexCoords = firstVertexCoords
+    vertexCoords = self % firstVertexRationalCoordinates
 
     ! Loop through all the edges in the face and check if the point lies on the same side
     ! of each edge (note: this assumes a consistent vertex numbering).
@@ -1002,7 +1009,7 @@ contains
         nextVertexCoords = self % vertices(i + 1) % ptr % getRatintCoordinates()
 
       else
-        nextVertexCoords = firstVertexCoords
+        nextVertexCoords = self % firstVertexRationalCoordinates
 
       end if
       dotProduct = dot_product(self % ratintNormal, crossProduct(nextVertexCoords - vertexCoords, r - vertexCoords))
@@ -1026,19 +1033,20 @@ contains
     real(defReal), dimension(3), intent(in) :: r
     integer(shortInt)                       :: i
     logical(defBool)                        :: isIt
+    real(defReal), parameter                :: FLOAT_TOL_SQUARED = floatTol * floatTol
 
     ! Initialise isIt = .true.
     isIt = .true.
 
     ! Compute distance to each vertex and immediately return if point is within tolerance to any of them.
     do i = 1, size(self % vertices) 
-      if(areEqual(sqrt(self % vertices(i) % ptr % distanceSquared(r)), ZERO)) return
+      if(self % vertices(i) % ptr % distanceSquared(r) < FLOAT_TOL_SQUARED) return
 
     end do
 
     ! Compute distance to each edge and immediately return if point is within tolerance to any of them.
     do i = 1, size(self % edges) 
-      if(areEqual(sqrt(self % edges(i) % ptr % distanceSquared(r)), ZERO)) return
+      if(self % edges(i) % ptr % distanceSquared(r) < FLOAT_TOL_SQUARED) return
 
     end do
 

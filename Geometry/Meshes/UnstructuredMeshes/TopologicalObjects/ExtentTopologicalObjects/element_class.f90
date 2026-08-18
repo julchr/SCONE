@@ -10,7 +10,7 @@ module element_class
   use numPrecision
   use publicObjects,                 only : basicElementInfo, intersectionTestPayload, intersectionTestResult, &
                                             resetIntersectionTestResult
-  use ratint
+  use ratint_mod
   use RNG_class,                     only : RNG
   use topologicalObject_inter,       only : buildTopologicalObjectPayload, kill_super => kill, topologicalObject, &
                                             topologicalObjectBox
@@ -822,6 +822,7 @@ contains
     class(intersectionTestPayload), intent(in)                       :: payload
     class(intersectionTestResult), intent(inout)                     :: result
     integer(shortInt)                                                :: i, faceArrayFront
+    integer(shortInt), dimension(size(self % orientatedFaces))       :: faceArrayIdxs
     logical(defBool)                                                 :: needsRescue
     real(defReal)                                                    :: dotProduct, faceLambda, minLambda, newMinLambda
     real(defReal), dimension(3)                                      :: centroid, firstVertexCoordinates, outwardNormal, &
@@ -830,7 +831,6 @@ contains
     type(elementIntersectionTestPayload), pointer                    :: payloadPtr
     type(elementIntersectionTestResult), pointer                     :: resultPtr
     type(faceBox)                                                    :: tempFace
-    type(orientatedFaceBox), dimension(size(self % orientatedFaces)) :: faceArray
     type(vertexBox), dimension(:), allocatable                       :: faceVertices
     character(*), parameter                                          :: HERE = 'intersects_Ray (element_class.f90)'
 
@@ -898,7 +898,7 @@ contains
         ! Update the array of faces intersected by the ray.
         if(ZERO <= faceLambda .and. faceLambda <= ONE) then
           faceArrayFront = faceArrayFront + 1
-          faceArray(faceArrayFront) = self % orientatedFaces(i) 
+          faceArrayIdxs(faceArrayFront) = self % orientatedFaces(i) % face % ptr % getIdx()
           faceArrayLambdas(faceArrayFront) = faceLambda
 
           ! Update intersected face.
@@ -936,7 +936,7 @@ contains
         do i = 1, faceArrayFront
           if(areEqual(minLambda, faceArrayLambdas(i))) then
             resultPtr % front = resultPtr % front + 1
-            resultPtr % currentFaceIdxs(resultPtr % front) = faceArray(i) % face % ptr % getIdx()
+            resultPtr % currentFaceIdxs(resultPtr % front) = faceArrayIdxs(i)
 
           end if
 

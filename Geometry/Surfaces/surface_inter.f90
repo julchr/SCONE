@@ -59,11 +59,11 @@ module surface_inter
     character(:), allocatable                    :: type
   contains
     ! Initialisation procedures
-    procedure, non_overridable                   :: getBoundingBox
-    procedure, non_overridable                   :: getId
-    procedure, non_overridable                   :: getOrigin
-    procedure, non_overridable                   :: getSurfTol
-    procedure, non_overridable                   :: getType
+    procedure                                    :: getBoundingBox
+    procedure                                    :: getId
+    procedure                                    :: getOrigin
+    procedure                                    :: getSurfTol
+    procedure                                    :: getType
     procedure(init), deferred                    :: init
     procedure                                    :: kill
     procedure                                    :: setBCs

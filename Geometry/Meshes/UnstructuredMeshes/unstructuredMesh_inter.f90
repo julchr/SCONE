@@ -17,6 +17,7 @@ module unstructuredMesh_inter
                                                 coordData, intersectionTestPayload, intersectionTestResult, &
                                                 meshBoundaryConditionInfo, meshLocalIdInfo, newCoordData, &
                                                 newIntersectionTestPayload
+  use ratint_mod
   use RNG_class,                         only : RNG
   use topologicalObject_inter,           only : topologicalObjectBox
   use topologicalObjectShelf_class,      only : topologicalObjectShelf
@@ -24,8 +25,6 @@ module unstructuredMesh_inter
   use triangulationMethod_inter,         only : triangulationMethod
   use universalVariables
   use vertex_class,                      only : buildVertexPayload, vertexBox
-  use ratint
-  use face_class
 
   implicit none
   private
@@ -364,7 +363,7 @@ contains
     
     ! First check whether the ray intersects the bounding box of the mesh.
     boundingBoxPtr => self % getBoundingBoxPtr()
-    call boundingBoxPtr % intersects(newIntersectionTestPayload(data % r, data % u, data % dMax), boundingBoxIntersectionResult)
+    boundingBoxIntersectionResult = boundingBoxPtr % intersects(newIntersectionTestPayload(data % r, data % u, data % dMax))
     if(.not. boundingBoxIntersectionResult % intersects) return
 
     call self % acceleration % findEntranceBoundaryFace(self % faces, data, nIntersectedFaces, intersectedFaceIdxs)

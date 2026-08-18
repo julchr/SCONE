@@ -41,7 +41,6 @@ contains
     logical(defBool), intent(in)             :: surfTolCondition
     real(defReal)                            :: d, delta, dMax
     real(defReal), dimension(:), allocatable :: solutions
-    logical(defBool)                         :: noIntersection
     
     ! Initialise d = INF and compute delta (technically, delta / 4).
     d = INF

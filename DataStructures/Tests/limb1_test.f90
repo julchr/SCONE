@@ -2,7 +2,7 @@ module limb1_test
     use numPrecision
     use funit
     use limb_class
-    use ratint
+    use ratint_mod
     use, intrinsic :: iso_fortran_env
     use, intrinsic :: ieee_arithmetic
 
@@ -1973,10 +1973,7 @@ contains
       ratint1 = convert_ieee64(v1)
       ratint2 = convert_ieee64(v2)
       v3 = ratint1 / ratint2
-      eval = evaluate(v3)
-      vres = v1 / v2
-      result = eval == vres
-      @assertTrue(result, message='ratintdiv6')
+      @assertTrue(checkInvalidRatint(v3), message='ratintdiv6')
 
 
 
