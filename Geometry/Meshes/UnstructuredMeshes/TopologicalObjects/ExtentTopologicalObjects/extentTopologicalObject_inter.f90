@@ -22,7 +22,7 @@ module extentTopologicalObject_inter
   type, public, extends(buildTopologicalObjectPayload) :: buildExtentTopologicalObjectPayload
     real(defReal), dimension(3)                 :: centroid
     real(defReal), dimension(:, :), allocatable :: allCoords
-    type(ratint_t), dimension(3)                :: rationalCentroid
+    !type(ratint_t), dimension(3)                :: rationalCentroid
     type(vertexBox), dimension(:), allocatable  :: vertices
   end type buildExtentTopologicalObjectPayload
 
@@ -128,7 +128,7 @@ contains
         call fatalError(here, 'Unallocated coordinates array for bounding box computation.')
         
         self % centroid = payloadPtr % centroid
-        self % rationalCentroid = payloadPtr % rationalCentroid
+        !self % rationalCentroid = payloadPtr % rationalCentroid
         call self % boundingBox % computeBounds(payloadPtr % allCoords)
 
       class default

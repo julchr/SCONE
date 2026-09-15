@@ -933,11 +933,11 @@ contains
         if (0 < elementInfos(i) % faceIdxs(j)) then
           payloads(i) % orientatedFaces(j) % isOwner = .true.
           payloads(i) % orientatedFaces(j) % outwardNormal = face % ptr % getNormal()
-          payloads(i) % orientatedFaces(j) % ratintOutwardNormal = face % ptr % getRatintNormal()
+          !payloads(i) % orientatedFaces(j) % ratintOutwardNormal = face % ptr % getRatintNormal()
 
         else
           payloads(i) % orientatedFaces(j) % outwardNormal = -face % ptr % getNormal()
-          payloads(i) % orientatedFaces(j) % ratintOutwardNormal = (-1_8)*(face % ptr % getRatintNormal())
+          !payloads(i) % orientatedFaces(j) % ratintOutwardNormal = (-1_8)*(face % ptr % getRatintNormal())
 
         end if
 

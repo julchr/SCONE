@@ -149,14 +149,14 @@ contains
         triangle = faces % getFaceBox(triangleIdx)
         tetrahedraPayloads(i) % orientatedFaces(j) % face = triangle
         outwardNormal = triangle % ptr % getNormal()
-        rationalOutwardNormal = triangle % ptr % getRatintNormal()
+        !rationalOutwardNormal = triangle % ptr % getRatintNormal()
         if(.not. tetrahedraPayloads(i) % orientatedFaces(j) % isOwner) then
           outwardNormal = -outwardNormal
-          call swapSign(rationalOutwardNormal)
+          !call swapSign(rationalOutwardNormal)
 
         end if
         tetrahedraPayloads(i) % orientatedFaces(j) % outwardNormal = outwardNormal
-        tetrahedraPayloads(i) % orientatedFaces(j) % ratintOutwardNormal = rationalOutwardNormal
+        !tetrahedraPayloads(i) % orientatedFaces(j) % ratintOutwardNormal = rationalOutwardNormal
 
       end do
 

@@ -45,7 +45,7 @@ module face_class
     logical(defBool)             :: isOwner = .false.
     real(defReal), dimension(3)  :: outwardNormal = ZERO
     type(faceBox)                :: face
-    type(ratint_t), dimension(3) :: ratintOutwardNormal
+    !type(ratint_t), dimension(3) :: ratintOutwardNormal
   end type orientatedFaceBox
   
   !! Face of an unstructured mesh. Consists of a list of vertices indices making the face up and 
@@ -70,8 +70,8 @@ module face_class
     logical(defBool)                                      :: isBoundary = .false.
     real(defReal)                                         :: area = ZERO
     real(defReal), dimension(N_BC_TYPES)                  :: boundaryValues = ZERO
-    real(defReal), dimension(3)                           :: firstVertexCoordinates = ZERO, normal = ZERO
-    type(ratint_t), dimension(3)                          :: firstVertexRationalCoordinates, ratintNormal
+    real(defReal), dimension(3)                           ::  normal = ZERO !, firstVertexCoordinates = ZERO
+    !type(ratint_t), dimension(3)                          :: firstVertexRationalCoordinates, ratintNormal
     type(edgeBox), dimension(:), allocatable              :: edges
     type(topologicalObjectBox), dimension(:), allocatable :: sharingElements
     type(vertexBox), dimension(:), allocatable            :: vertices
@@ -98,7 +98,9 @@ module face_class
     procedure          :: getFirstVertexRationalCoordinates
     procedure          :: getIsBoundary
     procedure          :: getNormal
-    procedure          :: getRatintNormal
+    !procedure          :: getRatintNormal
+    procedure :: calcRatintOutwardNormal
+    procedure :: calcRatintNormal
     procedure          :: getSharingElements
     procedure          :: getSharingFaceIdxs
     procedure          :: getSharingFaces
@@ -274,7 +276,7 @@ contains
         self % vertices(1) = payloadPtr % vertices(2)
         self % vertices(2) = payloadPtr % vertices(1)
         self % normal = -self % normal
-        self % ratintNormal = (-1_8) * (self % ratintNormal)
+        !self % ratintNormal = (-1_8) * (self % ratintNormal)
 
       end if
 
@@ -282,8 +284,8 @@ contains
 
     ! Cache the coordinates of the first vertex. Set here rather than in buildComponents, since
     ! the normal test above may swap the first two vertices.
-    self % firstVertexCoordinates = self % vertices(1) % ptr % getCoordinates()
-    self % firstVertexRationalCoordinates = self % vertices(1) % ptr % getRatintCoordinates()
+    !self % firstVertexCoordinates = self % vertices(1) % ptr % getCoordinates()
+    !self % firstVertexRationalCoordinates = self % vertices(1) % ptr % getRatintCoordinates()
 
   end subroutine build
 
@@ -302,17 +304,17 @@ contains
     ! First retrieve the coordinates of all the vertices in the face.
     nVertices = size(self % vertices)
     allocate(payload % allCoords(3, nVertices))
-    payload % rationalCentroid = convert_int(0_longInt)
+    !payload % rationalCentroid = convert_int(0_longInt)
     do i = 1, nVertices
       if (.not. associated(self % vertices(i) % ptr)) &
       call fatalError(here, 'Face with index '//numToChar(self % getIdx())//' contains a null vertex pointer.')
       payload % allCoords(:, i) = self % vertices(i) % ptr % getCoordinates()
-      payload % rationalCentroid = payload % rationalCentroid + self % vertices(i) % ptr % getRatintCoordinates()
+      !payload % rationalCentroid = payload % rationalCentroid + self % vertices(i) % ptr % getRatintCoordinates()
 
     end do
 
     ! Now average the exact face centroid.
-    payload % rationalCentroid = payload % rationalCentroid / int(nVertices, longInt)
+    !payload % rationalCentroid = payload % rationalCentroid / int(nVertices, longInt)
 
     ! Check if the face is a triangle. If so, perform a direct computation to avoid round-off errors.
     if (nVertices == 3) then
@@ -348,10 +350,10 @@ contains
 
     end if
 
-    self % ratintNormal = crossProduct(self % vertices(1) % ptr % getRatintCoordinates() - &
-                                       self % vertices(2) % ptr % getRatintCoordinates(), &
-                                       self % vertices(1) % ptr % getRatintCoordinates() - &
-                                       self % vertices(3) % ptr % getRatintCoordinates())
+    ! self % ratintNormal = crossProduct(self % vertices(1) % ptr % getRatintCoordinates() - &
+    !                                    self % vertices(2) % ptr % getRatintCoordinates(), &
+    !                                    self % vertices(1) % ptr % getRatintCoordinates() - &
+    !                                    self % vertices(3) % ptr % getRatintCoordinates())
 
   contains
     !!
@@ -638,27 +640,27 @@ contains
 
   end function getFaceIdx
 
-  !!
-  !!
-  !!
-  pure function getFirstVertexCoordinates(self) result(firstVertexCoordinates)
-    class(face), intent(in)     :: self
-    real(defReal), dimension(3) :: firstVertexCoordinates
+  ! !!
+  ! !!
+  ! !!
+  ! pure function getFirstVertexCoordinates(self) result(firstVertexCoordinates)
+  !   class(face), intent(in)     :: self
+  !   real(defReal), dimension(3) :: firstVertexCoordinates
 
-    firstVertexCoordinates = self % firstVertexCoordinates
+  !   firstVertexCoordinates = self % firstVertexCoordinates
 
-  end function getFirstVertexCoordinates
+  ! end function getFirstVertexCoordinates
 
-  !!
-  !!
-  !!
-  pure function getFirstVertexRationalCoordinates(self) result(firstVertexRationalCoordinates)
-    class(face), intent(in)      :: self
-    type(ratint_t), dimension(3) :: firstVertexRationalCoordinates
+  ! !!
+  ! !!
+  ! !!
+  ! pure function getFirstVertexRationalCoordinates(self) result(firstVertexRationalCoordinates)
+  !   class(face), intent(in)      :: self
+  !   type(ratint_t), dimension(3) :: firstVertexRationalCoordinates
 
-    firstVertexRationalCoordinates = self % firstVertexRationalCoordinates
+  !   firstVertexRationalCoordinates = self % firstVertexRationalCoordinates
 
-  end function getFirstVertexRationalCoordinates
+  ! end function getFirstVertexRationalCoordinates
 
   !! Function 'getIsBoundary'
   !!
@@ -698,17 +700,75 @@ contains
 
 
 
-  pure function getRatintNormal(self, idx) result(ratintNormal)
-    class(face), intent(in)                 :: self
-    type(ratint_t), dimension(3)             :: ratintNormal
-    integer(shortInt), intent(in), optional :: idx
+  ! pure function getRatintNormal(self, idx) result(ratintNormal)
+  !   class(face), intent(in)                 :: self
+  !   type(ratint_t), dimension(3)             :: ratintNormal
+  !   integer(shortInt), intent(in), optional :: idx
     
-    ratintNormal = self % ratintNormal
+  !   ratintNormal = self % ratintNormal
     
-    if (.not. present(idx)) return
-    if (idx < 0) ratintNormal = (-1_8)*ratintNormal
+  !   if (.not. present(idx)) return
+  !   if (idx < 0) ratintNormal = (-1_8)*ratintNormal
 
-  end function getRatintNormal
+  ! end function getRatintNormal
+
+
+
+  pure function getFirstVertexCoordinates(self) result(firstVertexCoordinates)
+    class(face), intent(in)     :: self
+    real(defReal), dimension(3) :: firstVertexCoordinates
+
+    firstVertexCoordinates = self % vertices(1) % ptr % getCoordinates()
+
+
+
+  end function getFirstVertexCoordinates
+
+  !!
+  !!
+  !!
+  pure function getFirstVertexRationalCoordinates(self) result(firstVertexRationalCoordinates)
+    class(face), intent(in)      :: self
+    type(ratint_t), dimension(3) :: firstVertexRationalCoordinates
+
+    firstVertexRationalCoordinates = self % vertices(1) % ptr % getRatintCoordinates()
+
+  end function getFirstVertexRationalCoordinates
+
+
+
+  pure function calcRatintOutwardNormal(self, reference) result(normal)
+    class(face), intent(in) :: self 
+    real(defReal), dimension(3), intent(in) :: reference 
+    type(ratint_t), dimension(3) :: normal 
+
+
+    normal = crossProduct(self % vertices(1) % ptr % getRatintCoordinates() - &
+                                       self % vertices(2) % ptr % getRatintCoordinates(), &
+                                       self % vertices(1) % ptr % getRatintCoordinates() - &
+                                       self % vertices(3) % ptr % getRatintCoordinates())
+
+    if (dot_product(normal, convert_ieee(reference - self%vertices(1)%ptr%getCoordinates())) > convert_ieee(0.0_defReal)) then 
+      call swapSign(normal)
+    end if 
+
+  end function calcRatintOutwardNormal
+
+
+
+  pure function calcRatintNormal(self) result(normal)
+    class(face), intent(in) :: self 
+    type(ratint_t), dimension(3) :: normal 
+
+
+    normal = crossProduct(self % vertices(1) % ptr % getRatintCoordinates() - &
+                                       self % vertices(2) % ptr % getRatintCoordinates(), &
+                                       self % vertices(1) % ptr % getRatintCoordinates() - &
+                                       self % vertices(3) % ptr % getRatintCoordinates())
+
+    
+
+  end function calcRatintNormal
 
   !! Function 'getTriangleIdxs'
   !!
@@ -865,7 +925,7 @@ contains
     real(defReal), dimension(3)                :: rIntersection
 
     ! Compute numerator and denominator.
-    numerator = dot_product(self % firstVertexCoordinates - payload % r, self % normal)
+    numerator = dot_product(self % getFirstVertexCoordinates() - payload % r, self % normal)
     denominator = dot_product(self % normal, payload % u)
     if(areEqual(denominator, ZERO)) then
       ! If denominator is nearly equal to zero, and the ray lies in the plane of the face, escalate to exact computation.
@@ -921,11 +981,11 @@ contains
     type(ratint_t)                                     :: denominator, t
 
     ! Compute denominator.
-    denominator = dot_product(self % ratintNormal, payload % u)
+    denominator = dot_product(self % calcRatintNormal(), payload % u)
     if(isZero(denominator)) return
 
     ! Compute distance along the ray to intersection.
-    t = dot_product(self % firstVertexRationalCoordinates - payload % r, self % ratintNormal) / denominator
+    t = dot_product(self % getFirstVertexRationalCoordinates() - payload % r, self % calcRatintNormal()) / denominator
 
     ! Return early if intersection is not possible.
     if((convert_int(0_longInt) > t .or. t > payload % dMax)) return
@@ -1000,7 +1060,7 @@ contains
     nVertices = size(self % vertices)
 
     ! Retrieve the coordinates of the first vertex and initialise vertexCoords = firstVertexCoords.
-    vertexCoords = self % firstVertexRationalCoordinates
+    vertexCoords = self % getFirstVertexRationalCoordinates()
 
     ! Loop through all the edges in the face and check if the point lies on the same side
     ! of each edge (note: this assumes a consistent vertex numbering).
@@ -1009,10 +1069,10 @@ contains
         nextVertexCoords = self % vertices(i + 1) % ptr % getRatintCoordinates()
 
       else
-        nextVertexCoords = self % firstVertexRationalCoordinates
+        nextVertexCoords = self % getFirstVertexRationalCoordinates()
 
       end if
-      dotProduct = dot_product(self % ratintNormal, crossProduct(nextVertexCoords - vertexCoords, r - vertexCoords))
+      dotProduct = dot_product(self % calcRatintNormal(), crossProduct(nextVertexCoords - vertexCoords, r - vertexCoords))
       if(ZERO_rational > dotProduct) return
 
       ! Update vertexCoords.

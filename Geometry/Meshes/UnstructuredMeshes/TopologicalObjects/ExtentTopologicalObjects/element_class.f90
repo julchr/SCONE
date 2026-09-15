@@ -300,16 +300,16 @@ contains
     ! Compute the number of vertices in the element.
     nVertices = size(self % vertices)
     allocate(payload % allCoords(3, nVertices))
-    payload % rationalCentroid = convert_int(0_longInt)
+    !payload % rationalCentroid = convert_int(0_longInt)
     do i = 1, nVertices
       if (.not. associated(self % vertices(i) % ptr)) call fatalError(here, 'Element contains a null vertex pointer.')
       payload % allCoords(:, i) = self % vertices(i) % ptr % getCoordinates()
-      payload % rationalCentroid = payload % rationalCentroid + self % vertices(i) % ptr % getRatintCoordinates()
+      !payload % rationalCentroid = payload % rationalCentroid + self % vertices(i) % ptr % getRatintCoordinates()
 
     end do
 
     ! Now average exact centroid.
-    payload % rationalCentroid = payload % rationalCentroid / int(nVertices, longInt)
+    !payload % rationalCentroid = payload % rationalCentroid / int(nVertices, longInt)
 
     ! If the element is a tetrahedron, perform a direct calculation to avoid round-off errors.
     if (nVertices == 4) then
@@ -482,7 +482,7 @@ contains
       firstVertexCoordinates_ratint = faceVertices(1) % ptr % getRatintCoordinates()
 
       ! Retrieve the outward normal of the current face then compute lambda.
-      outwardNormal_ratint = self % orientatedFaces(i) % ratintOutwardNormal
+      outwardNormal_ratint = self % orientatedFaces(i) % face%ptr%calcRatintOutwardNormal(self%getCentroid())
       
       ! Compute denominator and cycle to next face if it is ZERO.
       dotProduct_ratint = dot_product(convert_ieee(u) * convert_ieee(dMax), outwardNormal_ratint)
@@ -493,11 +493,8 @@ contains
 
 
       maxLambdaLimbSizeNum = max(maxLambdaLimbSizeNum, faceLambda%p%front)
-
       allCounts(currentK, 12) = max(allCounts(currentK, 12), maxLambdaLimbSizeNum)
-
       maxLambdaLimbSizeDen = max(maxLambdaLimbSizeDen, faceLambda%q%front)
-
       allCounts(currentK, 13) = max(allCounts(currentK, 12), maxLambdaLimbSizeDen)
       
       ! Update the array of faces intersected by the ray.
@@ -656,7 +653,7 @@ contains
       if(.not. any(faceIdxs == self % orientatedFaces(i) % face % ptr % getIdx())) cycle
 
       ! Compute dot product between face outward normal and direction.
-      dotProduct = dot_product(u, self % orientatedFaces(i) % ratintOutwardNormal)
+      dotProduct = dot_product(u, self % orientatedFaces(i) % face%ptr%calcRatintOutwardNormal(self%getCentroid()))
 
       ! If dot product is positive, return immediately.
       if(dotProduct > ZERO_rational) return
@@ -960,7 +957,6 @@ contains
           if(faceLambda < minLambda) then
             minLambda = faceLambda
             tempFace = self % orientatedFaces(i) % face
-            tempO = self % orientatedFaces(i)
 
           end if
 
@@ -1106,7 +1102,7 @@ contains
       ! Make a vector going from the coordinates to the face's first vertex and perform the dot
       ! product between this vector and the face's normal vector.
       dotProduct = dot_product(self % orientatedFaces(i) % face % ptr % getFirstVertexRationalCoordinates() - r, &
-                               self % orientatedFaces(i) % ratintOutwardNormal)
+                               self % orientatedFaces(i) % face%ptr%calcRatintOutwardNormal(self%getCentroid()))
 
       ! Check if the point is effectively on the plane of this face.
       if(isZero(dotProduct)) then
