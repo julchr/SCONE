@@ -10,12 +10,13 @@ module limb_class
   integer(shortInt), parameter :: MAXIMUM_SIZE = 1977
   real(defReal), parameter :: TWO_POW_31 = TWO ** 31, TWO_POW_62 = TWO ** 62
 
+! Indexed from 0 to allow the lowest index to act as a 'null' index for managing unfilled values
+! Only use 1-1977 in calculations
   type limb_t
-    ! Indexed from 0 to allow the lowest index to act as a 'null' index for managing unfilled values
-    ! Only use 1-1977 in calculations
     integer(shortInt)                            :: front = -1, sign = 1
     integer(shortInt), dimension(0:MAXIMUM_SIZE) :: limbs
   end type limb_t
+
 
   interface initlimb
     module procedure initlimbempty, initlimbnumlong!, initlimbnumshort

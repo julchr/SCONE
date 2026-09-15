@@ -5,7 +5,7 @@ module compoundSurface_inter
   use genericProcedures,  only : areEqual, numToChar
   use ratint_mod
   use surface_inter,      only : kill_super => kill, surface
-  use universalVariables, only : INF, MISS_TOL, PERIODIC_BC, REFLECTIVE_BC, VACUUM_BC
+  use universalVariables
 
   implicit none
   private
@@ -200,7 +200,7 @@ contains
       
       ! Retrieve direction component for the current dimension.
       uComponent = uComponents(i)
-      if (areEqual(uComponent, ZERO)) then
+      if (ESCALATE .and. areEqual(uComponent, ZERO)) then
         ! If ray is approximately parallel to current dimension, launch exact computation and return.
         isIt = self % isHalfspacePositive(convert_ieee(rComponents), convert_ieee(uComponents))
         return

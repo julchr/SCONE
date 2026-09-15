@@ -3,7 +3,7 @@ module noAcceleration_class
   use accelerationStructure_inter,  only : accelerationStructure, initAccelerationStructurePayload
   use dictionary_class,             only : dictionary
   use face_class,                   only : face, faceBox
-  use genericProcedures,            only : areEqual, fatalError, numToChar
+  use genericProcedures
   use element_class,                only : element, elementBox, inclusionTestResult
   use numPrecision
   use publicObjects,                only : coordData, intersectionTestPayload, intersectionTestResult, &
@@ -12,8 +12,7 @@ module noAcceleration_class
   use ratint_mod
   use topologicalObject_inter,      only : topologicalObjectBox
   use topologicalObjectShelf_class, only : topologicalObjectShelf
-  use universalVariables,           only : INF, INSIDE_ELEMENT, NUDGE, ON_BOUNDARY_ELEMENT, OUTSIDE_ELEMENT, &
-                                           SURF_TOL, VALENCE
+  use universalVariables           
 
   implicit none
   private
@@ -54,6 +53,11 @@ contains
     intersectedFaceIdxs = 0
     dMin = INF
 
+
+    nBoundaryCrossings = nBoundaryCrossings + 1
+    allCounts(currentK, 3) = allCounts(currentK, 3) + 1
+
+
     ! Initialise intersection test payload.
     payload = newIntersectionTestPayload(data % r, data % u, data % dMax)
 
@@ -73,9 +77,14 @@ contains
 
       ! Compute distance to boundary face and move onto the next face if it is not intersected.
       call testFace % ptr % intersects_Ray(payload, intersectionResult)
+      !print *, data%faceIdx
 
       ! Escalate to exact computation if needed.
-      if(intersectionResult % needsRescue) then
+      if(ESCALATE .and. intersectionResult % needsRescue) then
+
+        nBoundaryCrossings_rational = nBoundaryCrossings_rational + 1
+        allCounts(currentK, 4) = allCounts(currentK, 4) + 1
+        
         call self % findEntranceBoundaryFace_rational(faces, data, nIntersectedFaces, intersectedFaceIdxs)
         return
 

@@ -3,7 +3,7 @@ module face_class
   use axisAlignedBoundingBox_class,  only : axisAlignedBoundingBox
   use extentTopologicalObject_inter, only : buildExtentTopologicalObjectPayload, extentTopologicalObject
   use edge_class,                    only : edgeBox
-  use genericProcedures,             only : append, areEqual, crossProduct, fatalError, numToChar
+  use genericProcedures
   use numPrecision
   use publicObjects,                 only : intersectionTestPayload, intersectionTestResult, meshBoundaryConditionInfo, &
                                             rationalIntersectionTestPayload, resetIntersectionTestResult
@@ -869,7 +869,7 @@ contains
     denominator = dot_product(self % normal, payload % u)
     if(areEqual(denominator, ZERO)) then
       ! If denominator is nearly equal to zero, and the ray lies in the plane of the face, escalate to exact computation.
-      if(areEqual(numerator, ZERO)) result % needsRescue = .true.
+      if(areEqualETOL(numerator, ZERO)) result % needsRescue = .true.
       return
 
     end if
@@ -894,7 +894,7 @@ contains
     if(self % isPointNearEdgeOrVertex(rIntersection)) then
       result % needsRescue = .true.
 
-    elseif(isIntersectionPointInside .and. (areEqual(t, ZERO) .or. areEqual(t, payload % dMax))) then
+    elseif(isIntersectionPointInside .and. (areEqualETOL(t, ZERO) .or. areEqualETOL(t, payload % dMax))) then
       result % needsRescue = .true.
 
     end if
@@ -1028,24 +1028,27 @@ contains
   !!
   !!
   !!
-  pure function isPointNearEdgeOrVertex(self, r) result(isIt)
+  function isPointNearEdgeOrVertex(self, r) result(isIt)
     class(face), intent(in)                 :: self
     real(defReal), dimension(3), intent(in) :: r
     integer(shortInt)                       :: i
     logical(defBool)                        :: isIt
-    real(defReal), parameter                :: FLOAT_TOL_SQUARED = floatTol * floatTol
+
+    real(defReal), parameter                :: FLOAT_TOL_SQUARED = ADJ_FLOAT_TOL * ADJ_FLOAT_TOL
 
     ! Initialise isIt = .true.
     isIt = .true.
 
     ! Compute distance to each vertex and immediately return if point is within tolerance to any of them.
     do i = 1, size(self % vertices) 
+      !print *, self % vertices(i) % ptr % distanceSquared(r)
       if(self % vertices(i) % ptr % distanceSquared(r) < FLOAT_TOL_SQUARED) return
 
     end do
 
     ! Compute distance to each edge and immediately return if point is within tolerance to any of them.
     do i = 1, size(self % edges) 
+      !print *, self % edges(i) % ptr % distanceSquared(r)
       if(self % edges(i) % ptr % distanceSquared(r) < FLOAT_TOL_SQUARED) return
 
     end do

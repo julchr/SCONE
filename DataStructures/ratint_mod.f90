@@ -7,9 +7,11 @@ module ratint_mod
 
   implicit none 
 
+  
   type ratint_t
     type(limb_t) :: p, q
   end type ratint_t
+
 
   interface signed
     module procedure signed_longInt
@@ -21,6 +23,11 @@ module ratint_mod
     module procedure convert_ieee64
     module procedure convert_ieee64Vector
   end interface convert_ieee
+
+  interface evaluate
+    module procedure evaluateFlat
+    module procedure evaluateVec 
+  end interface evaluate
 
   interface isZero 
     module procedure isZero_flat 
@@ -396,13 +403,26 @@ module ratint_mod
       d = r%q
   end function get_denominator
 
-  pure function evaluate(r) result(v)
+  pure function evaluateFlat(r) result(v)
     type(ratint_t), intent(in) :: r 
     real(defReal) :: v 
 
     v = r%p / r%q
 
-  end function evaluate
+  end function evaluateFlat
+
+
+  pure function evaluateVec(r) result(v)
+    type(ratint_t), dimension(:), intent(in) :: r 
+    real(defReal), dimension(size(r)) :: v 
+    integer(shortInt) :: i
+
+
+    do i=1, size(r)
+      v(i) = evaluate(r(i))
+    end do
+
+  end function evaluateVec
 
   elemental function addpure(r1, r2) result(res)
     type(ratint_t), intent(in) :: r1, r2

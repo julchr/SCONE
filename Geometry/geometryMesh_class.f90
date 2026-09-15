@@ -249,6 +249,7 @@ contains
     class(mesh), pointer                     :: meshPtr
     integer(shortInt), dimension(N_BC_TYPES) :: boundaryConditions
     type(coordData)                          :: updateData
+    integer(shortInt)                        :: oldElement, newElement
     character(*), parameter                  :: here = 'move (geometryMesh_class.f90)'
 
     if (.not. coords % isPlaced()) call fatalError(Here, 'Coordinate list is not placed in the geometry.')
@@ -258,13 +259,22 @@ contains
     updateData % dMax = maxDist
     meshPtr => self % meshes % getMeshPtr(updateData % meshIdx)
 
+    oldElement = updateData%elementIdx
+
     ! Find the distance to the next mesh face intersection.
     call meshPtr % distanceToNextFace(updateData)
+
 
     if (maxDist < updateData % d) then ! Moves within cell
       ! Move local, register event and return early
       call coords % moveLocal(maxDist, coords % getNesting())
       event = COLL_EV
+
+      ! PARTICLE LOSS CHECK
+      if (updateData%elementIdx /= oldElement) then 
+        call fatalError(Here, 'PARTICLE LOST. Particle has geometrically remained in the cell but moved to a different element.')
+      end if
+
       return
 
     end if
@@ -275,6 +285,12 @@ contains
 
     ! Check if the face that was hit is a boundary face.
     if (meshPtr % getFaceIsBoundary(updateData % faceIdx)) then
+
+      ! PARTICLE LOSS CHECK
+      if (updateData%elementIdx /= 0) then 
+        call fatalError(Here, 'PARTICLE LOST. Particle has geometrically hit the boundary but not 0.')
+      end if
+
       ! We have hit a boundary. Check if boundary condition is void and return early if so. Else, apply boundary conditions.
       event = BOUNDARY_EV
       boundaryConditions = meshPtr % getFaceBoundaryConditions(updateData % faceIdx)
@@ -291,6 +307,12 @@ contains
 
     else
       ! Particle moves from element to element. Update coordinates, then find materialIdx and uniqueId.
+
+      ! PARTICLE LOSS CHECK
+      if (updateData%elementIdx == oldElement) then 
+        call fatalError(Here, 'PARTICLE LOST. Particle has geometrically moved to another cell but remains within it.')
+      end if
+
       event = CROSS_EV
       updateData % r = coords % getPosition(1)
       call coords % updateCoordinatesFromData(1, updateData)

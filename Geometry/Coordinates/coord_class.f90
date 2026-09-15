@@ -39,7 +39,7 @@ module coord_class
     integer(shortInt)                     :: cellIdx = 0, elementIdx = 0, front = 0, localId = 0, meshIdx = 0, &
                                              universeIdx = 0, universeRootId = 0
     integer(shortInt), dimension(VALENCE) :: currentFaceIdxs = 0
-    logical(defBool)                      :: isRotated = .false.
+    logical(defBool)                      :: isRotated = .false., leftBoundary = .false.
     real(defReal), dimension(3)           :: r = ZERO, dir = ZERO
     real(defReal), dimension(3, 3)        :: rotMat = ZERO
   contains
@@ -117,6 +117,7 @@ contains
     data % currentFaceIdxs = self % currentFaceIdxs
     data % r = self % r
     data % u = self % dir
+    !data%leftBoundary = self%leftBoundary
 
   end function getData
 
@@ -443,6 +444,7 @@ contains
     self % r = data % r
     self % dir = data % u
     self % rotMat = data % rotationMatrix
+    !self%leftBoundary = data%leftBoundary
 
   end subroutine updateFromData
 

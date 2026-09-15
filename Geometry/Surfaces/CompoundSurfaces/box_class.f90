@@ -7,7 +7,7 @@ module box_class
   use numPrecision
   use ratint_mod,            evaluate_ratint => evaluate
   use surface_inter,         only : kill_super => kill
-  use universalVariables,    only : INF
+  use universalVariables
 
   implicit none
   private
@@ -158,7 +158,7 @@ contains
     bounds = self % getBounds()
 
     do i = 1, 3
-      if((areEqual(r(i), bounds(i, 1)) .or. areEqual(r(i), bounds(i, 2))) .and. areEqual(u(i), ZERO)) then
+      if(ESCALATE .and. ((areEqual(r(i), bounds(i, 1)) .or. areEqual(r(i), bounds(i, 2))) .and. areEqual(u(i), ZERO))) then
         d = self % distance_rational(surfTolCondition, convert_ieee(r), convert_ieee(u))
         return
 
@@ -186,7 +186,7 @@ contains
 
     ! If results are ambiguous, launch an exact computation.
     if(areEqual(tNear, tFar) .or. &
-       (.not. surfTolCondition .and. (areEqual(tNear, ZERO) .or. areEqual(tFar, ZERO)))) then
+       (ESCALATE .and. (.not. surfTolCondition .and. (areEqual(tNear, ZERO) .or. areEqual(tFar, ZERO))))) then
       d = self % distance_rational(surfTolCondition, convert_ieee(r), convert_ieee(u))
 
     else

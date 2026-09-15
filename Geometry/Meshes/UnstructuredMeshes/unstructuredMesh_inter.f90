@@ -6,10 +6,9 @@ module unstructuredMesh_inter
   use charMap_class,                     only : charMap
   use dictionary_class,                  only : dictionary
   use edge_class,                        only : edgeBox
-  use element_class,                     only : buildElementPayload, element, elementBox, inclusionTestResult, &
-                                                elementIntersectionTestResult, newElementIntersectionTestPayload
+  use element_class
   use extentTopologicalObject_inter,     only : buildExtentTopologicalObjectPayload
-  use face_class,                        only : buildFacePayload, face, faceBox
+  use face_class
   use genericProcedures,                 only : append, areEqual, fatalError, findCommon, numToChar
   use mesh_inter,                        only : mesh, kill_super => kill
   use numPrecision
@@ -333,7 +332,7 @@ contains
     call dict % get(fillNames, 'fills')
     if (size(fillNames) /= nLocalIds) call fatalError(here, 'Mismatch between number of localIds and material fills.')
     allocate(localIdsToMaterialIdxs(nLocalIds))
-    
+
     do i = 1, nLocalIds
       materialIdx = materialsMap % getOrDefault(fillNames(i), NOT_PRESENT)
       if (materialIdx == NOT_PRESENT) call fatalError(here, 'Unknown materal: '//trim(fillNames(i))//'.')
@@ -360,14 +359,19 @@ contains
     integer(shortInt)                     :: nIntersectedFaces
     integer(shortInt), dimension(VALENCE) :: intersectedFaceIdxs
     character(*), parameter               :: HERE = 'distanceToBoundary (unstructuredMesh_inter.f90)'
-    
+
     ! First check whether the ray intersects the bounding box of the mesh.
     boundingBoxPtr => self % getBoundingBoxPtr()
-    boundingBoxIntersectionResult = boundingBoxPtr % intersects(newIntersectionTestPayload(data % r, data % u, data % dMax))
+
+
+    boundingBoxIntersectionResult = boundingBoxPtr % intersects(newIntersectionTestPayload(data%r,data%u,data%dMax,&
+             data%elementIdx, data%leftBoundary))
+
     if(.not. boundingBoxIntersectionResult % intersects) return
 
     call self % acceleration % findEntranceBoundaryFace(self % faces, data, nIntersectedFaces, intersectedFaceIdxs)
-    
+  
+
     ! If no faces were intersected, return.
     if(nIntersectedFaces == 0) return
 
@@ -378,7 +382,11 @@ contains
     call self % findHostElementIdxFromDirection(data % front, data % currentFaceIdxs, data % u, data % elementIdx, data % localId)
 
     ! If no element was found, set distance to INF.
-    if(data % elementIdx == 0) data % d = INF
+    if(data % elementIdx == 0) then 
+      data % d = INF
+      data%leftBoundary = .true. 
+    end if
+
 
   end subroutine distanceToBoundary
 
@@ -400,6 +408,7 @@ contains
     ! Retrieve the element currently occupied by the particle and compute potential 
     ! face intersections.
     currentElement = self % elements % getElementBox(data % elementIdx)
+
     call currentElement % ptr % intersects_ray(newElementIntersectionTestPayload(data % r, data % u, data % dMax, .true., &
                                                                                  data % front, data % currentFaceIdxs, .false.), &
                                                                                  intersectionResult)
@@ -410,10 +419,15 @@ contains
     data % front = intersectionResult % front
     data % currentFaceIdxs(1:data % front) = intersectionResult % currentFaceIdxs(1:data % front)
 
+
     ! Early return optimisation for cases where only one face is intersected and this is a boundary face.
     if(intersectionResult % front == 1 .and. intersectionResult % intersectedFace % ptr % getIsBoundary()) then
+
       data % elementIdx = 0
       data % localId = 0
+      data%leftBoundary = .true.
+      data%faceIdx = intersectionResult % intersectedFace % ptr %getIdx()
+
       return
 
     elseif(data % front == 0) then
@@ -421,7 +435,8 @@ contains
       call fatalError(HERE, 'Invalid number of faces intersected.')
 
     else
-      call self % findHostElementIdxFromDirection(data % front, data % currentFaceIdxs, data % u, &
+     ! if (intersectionResult%test) print *, 'ok'
+      call findHostElementIdxFromDirection(self, data % front, data % currentFaceIdxs, data % u, &
                                                   data % elementIdx, data % localId, currentElement)
 
     end if
@@ -503,9 +518,6 @@ contains
 
   end subroutine findHostElement
 
-  !!
-  !!
-  !!
   subroutine findHostElementIdxFromDirection(self, nIntersectedFaces, intersectedFaceIdxs, u, elementIdx, localId, &
                                              currentElement)
     class(unstructuredMesh), intent(in)                   :: self
@@ -520,8 +532,10 @@ contains
     type(faceBox)                                         :: currentFace
     type(topologicalObjectBox), dimension(:), allocatable :: elements
     type(vertexBox)                                       :: commonVertex
+    logical(defBool)                                       :: check
     character(*), parameter                               :: HERE = 'findHostElementIdxFromDirection (unstructuredMesh_inter.f90)'
 
+    check = .false.
     select case(nIntersectedFaces)
         case(1)
           currentFace = self % faces % getFaceBox(intersectedFaceIdxs(1))
@@ -529,6 +543,11 @@ contains
           faceIdxs = currentFace % ptr % getSharingFaceIdxs()
 
         case(2)
+
+   
+          nTieSet1 = nTieSet1 + 1
+          allCounts(currentK, 8) = allCounts(currentK, 8) + 1
+ 
           ! Find unique common edge index between the two intersected faces.
           currentFace = self % faces % getFaceBox(intersectedFaceIdxs(1))
           commonEdgeIdxs = currentFace % ptr % getEdgeIdxs()
@@ -547,6 +566,11 @@ contains
           faceIdxs = commonEdge % ptr % getSharingFaceIdxs()
 
         case default
+          
+
+          nTieSet2 = nTieSet2 + 1
+          allCounts(currentK, 9) = allCounts(currentK, 9) + 1
+
           ! Find unique common vertex between all intersected faces.
           currentFace = self % faces % getFaceBox(intersectedFaceIdxs(1))
           commonVertexIdxs = currentFace % ptr % getVertexIdxs()
@@ -585,12 +609,19 @@ contains
 
             ! Retrieve element index then check if particle enters the current element.
             currentElementIdx = ptr % getIdx()
-            if(ptr % entersThroughFaces(faceIdxs, u) .and. &
+            if(nIntersectedFaces > 1 .and. ptr % entersThroughFaces(faceIdxs, u) .and. &
                (elementIdx == 0 .or. currentElementIdx < elementIdx)) then
               ! Update lowest element index and corresponding local ID.
               elementIdx = currentElementIdx
               localId = ptr % getLocalId()
+              check = .true.
+              return
 
+            else if  (nIntersectedFaces == 1) then
+              elementIdx = currentElementIdx
+              localId = ptr % getLocalId()
+              check = .true.
+              return
             end if
 
           class default
@@ -600,7 +631,11 @@ contains
 
       end do
 
+
+
   end subroutine findHostElementIdxFromDirection
+
+
 
   !!
   !!

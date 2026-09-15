@@ -121,4 +121,59 @@ module universalVariables
                                    nameTemperature = 'temperature', nameUFS = 'uniFissSites', &
                                    nameWW = 'WeightWindows'
 
+  logical(defBool), parameter :: ESCALATE = .true. 
+
+
+  integer(shortInt), save :: nElementCrossings = 0, nElementCrossings_rational = 0, &
+                            nBoundaryCrossings = 0, nBoundaryCrossings_rational = 0,&
+                            nInplane = 0, nNearFeature = 0, nStartEnd = 0,&
+                            nTieSet1=0, nTieSet2 =0, nisInsideElem = 0, nEntersFaces = 0, &
+                            maxLambdaLimbSizeNum=0, maxLambdaLimbSizeDen = 0, nAxis1 = 0, nAxis2 = 0, nAxisT=0
+
+
+  integer(shortInt), parameter :: POPSIZE = 20
+
+  real(defReal), dimension(POPSIZE), save :: particleTimesTotal = [0,0,0,0,0,0,0,0,0,0, &
+                                                              0,0,0,0,0,0,0,0,0,0]
+                                                              !0,0,0,0,0,0,0,0,0,0, &
+                                                             ! 0,0,0,0,0,0,0,0,0,0]
+
+  real(defReal), dimension(POPSIZE), save :: elemescalations = [0,0,0,0,0,0,0,0,0,0, &
+                                                              0,0,0,0,0,0,0,0,0,0]
+  
+  real(defReal), dimension(POPSIZE), save :: elemescalationsavg = [0,0,0,0,0,0,0,0,0,0, &
+                                                              0,0,0,0,0,0,0,0,0,0]
+
+  real(defReal), dimension(POPSIZE), save :: elementnums = [0,0,0,0,0,0,0,0,0,0, &
+                                                              0,0,0,0,0,0,0,0,0,0]
+
+  real(defReal), dimension(POPSIZE), save :: boundaryescalations = [0,0,0,0,0,0,0,0,0,0, &
+                                                              0,0,0,0,0,0,0,0,0,0]
+
+  real(defReal), dimension(POPSIZE), save :: boundaryescalationsavg = [0,0,0,0,0,0,0,0,0,0, &
+                                                              0,0,0,0,0,0,0,0,0,0]
+
+  real(defReal), dimension(POPSIZE), save :: boundarynums = [0,0,0,0,0,0,0,0,0,0, &
+                                                              0,0,0,0,0,0,0,0,0,0]
+
+  integer(shortInt), dimension(20, 16), save :: allCounts = 0 
+
+
+  real(defReal), dimension(20, 16), save :: totalAllCounts = 0
+
+
+  integer(shortInt), save :: currentK = 1, currentCycle = 1
+
+
+  integer(shortInt), save :: particleSums = 0
+
+  integer(shortInt), save :: lastElem = 0, lastBoundary = 0
+
+  real(defReal), dimension(16), save :: avgCount =  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+
+
+
+  real(defReal), parameter :: ADJ_FLOAT_TOL = 1.0e-9_defReal
+                              
+
 end module universalVariables

@@ -1,11 +1,11 @@
 module axisAlignedBoundingBox_class
 
-  use genericProcedures,  only : anyAreEqual, areEqual, swap
+  use genericProcedures
   use numPrecision
   use publicObjects,      only : intersectionTestPayload, intersectionTestResult, &
                                  newRationalIntersectionTestPayload, rationalIntersectionTestPayload
   use ratint_mod
-  use universalVariables, only : INF, NUDGE, ONE, SURF_TOL, ZERO
+  use universalVariables
 
   implicit none
   private
@@ -223,21 +223,33 @@ contains
   !!
   !!
   !!
-  pure function intersects_Ray(self, payload) result(res)
+  function intersects_Ray(self, payload) result(res)
     class(axisAlignedBoundingBox), intent(in)  :: self
     class(intersectionTestPayload), intent(in) :: payload
     integer(shortInt)                          :: i
-    real(defReal)                              :: inverseU, tFar, tNear, t1, t2
+    real(defReal)                              :: inverseU, tFar, tNear, t1, t2, howNudged, nudge
+    logical(defBool)                           :: nudged1, nudged2
     type(intersectionTestResult)               :: res
+
+
+    nAxisT = nAxisT + 1
+    allCounts(currentK, 16) = allCounts(currentK, 16) + 1
+
 
     ! Initialise tNear = -INF, tFar = INF, then loop over all halfwidths.
     tNear = -INF
     tFar = INF
 
+    
+
     do i = 1, 3
       if(areEqual(payload % u(i), ZERO)) then
-        if(areEqual(payload % r(i), self % bounds(i, 1)) .or. &
-           areEqual(payload % r(i), self % bounds(i, 2))) then
+        if(ESCALATE .and. (areEqual(payload % r(i), self % bounds(i, 1)) .or. &
+           areEqual(payload % r(i), self % bounds(i, 2)))) then
+
+            nAxis1 = nAxis1 + 1
+            allCounts(currentK, 14) = allCounts(currentK, 14) + 1
+      
           ! If ray is parallel to current dimension and is within tolerance of either plane of the
           ! bounding box along the current dimension, launch exact computation and return.
           res = self % intersects_ray_rational(newRationalIntersectionTestPayload(convert_ieee(payload % r), &
@@ -252,13 +264,26 @@ contains
         cycle
 
       else
+        nudged1 = .false.
+        nudged2 = .false.
+        howNudged = payload%u(i)
+
         inverseU = ONE / payload % u(i)
+
+
         t1 = (self % bounds(i, 1) - payload % r(i)) * inverseU
+
+
         t2 = (self % bounds(i, 2) - payload % r(i)) * inverseU
+
+
         if(t2 < t1) call swap(t1, t2)
+
+
 
         tNear = max(tNear, t1)
         tFar = min(tFar, t2)
+
 
         ! Return early if intersection is impossible (far intersection is definitely greater than near intersection, or far
         ! intersection is definitely negative).
@@ -269,15 +294,27 @@ contains
 
     end do
 
+
+
+    
     ! If results are ambiguous, launch an exact computation.
-    if(areEqual(tNear, ZERO) .or. areEqual(tFar, ZERO) .or. areEqual(tNear, tFar)) then
+    if(ESCALATE.and.(areEqualETOL(tNear, tFar))) then
+
+      nAxis2 = nAxis2 + 1
+      allCounts(currentK, 15) = allCounts(currentK, 15) + 1
+
+
       res = self % intersects_ray_rational(newRationalIntersectionTestPayload(convert_ieee(payload % r), &
                                                                               convert_ieee(payload % u), &
                                                                               convert_ieee(payload % dMax)))
+
       ! TODO: change this; needs exact computed distance. Do this when reworking acceleration structures.
+      
+      !res % d = merge(merge(tFar, tFar+howNudged*NUDGE,nudged1), merge(tNear, tNear+howNudged*NUDGE,nudged2), tNear < ZERO)
       res % d = merge(tFar, tNear, tNear < ZERO)
 
     else
+      !res % d = merge(merge(tFar, tFar+howNudged*NUDGE,nudged1), merge(tNear, tNear+howNudged*NUDGE,nudged2), tNear < ZERO)
       res % d = merge(tFar, tNear, tNear < ZERO)
       res % intersects = .true.
 

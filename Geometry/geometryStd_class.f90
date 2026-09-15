@@ -127,11 +127,13 @@ contains
     logical(defBool)                         :: update
     real(defReal)                            :: testDistance
     type(coordData)                          :: levelData
+    integer(shortInt)                        :: oldElement
 
     ! Loop over all geometry levels.
     testDistance = INF
     do l = 1, coords % getNesting()
       levelData = coords % getCoordinatesData(l)
+      oldElement = levelData%elementIdx
       ! Check if cache is present and valid.
       update = .true.
       if (present(cache)) then
@@ -145,6 +147,8 @@ contains
         call self % geom % distanceUniverse(levelData)
         testDistance = levelData % d
         testIdx = levelData % surfaceIdx
+
+        
 
         if (present(cache)) then
           ! Update cache and mark this level as valid.
@@ -330,16 +334,26 @@ contains
     integer(shortInt), intent(out)           :: event
     type(distCache), intent(inout), optional :: cache
     integer(shortInt)                        :: borderIdx
-    type(coordData)                          :: updateData
+    type(coordData)                          :: updateData, oldData
+    integer(shortInt)                        :: oldElement
     character(*), parameter                  :: Here = 'move (geometryStd_class.f90)'
 
     if (.not. coords % isPlaced()) call fatalError(Here, 'Coordinate list is not placed in the geometry.')
+
+    oldData = coords% getCoordinatesData(1)
+    oldElement = oldData%elementIdx
 
     ! Find distance to the next surface and reset cache level to 0 afterwards
     call self % closestDist(maxDist, coords, updateData, cache)
     if (present(cache)) cache % lvl = 0
 
     if (maxDist < updateData % d) then ! Moves within cell
+
+      ! PARTICLE LOSS CHECK
+      if (updateData%elementIdx /= oldElement) then 
+        call fatalError(Here, 'PARTICLE LOST. Particle has geometrically remained in the cell but moved to a different element.')
+      end if
+
       ! Move local, register event and return early
       call coords % moveLocal(maxDist, coords % getNesting())
 
@@ -356,6 +370,12 @@ contains
 
     borderIdx = self % geom % getBorderIdx()
     if (updateData % surfaceIdx == borderIdx .and. updateData % updateLevel == 1) then ! Hits domain boundary
+
+      ! PARTICLE LOSS CHECK
+      if (updateData%elementIdx /= 0) then 
+        call fatalError(Here, 'PARTICLE LOST. Particle has geometrically crossed a boundary but not element 0.')
+      end if
+
       ! Move global to the boundary and register event
       call coords % moveGlobal(updateData % d)
       event = BOUNDARY_EV
@@ -368,6 +388,12 @@ contains
 
     else
       ! The particle moves locally within its cell. Move to boundary at hit level.
+
+      ! ! PARTICLE LOSS CHECK
+      ! if (updateData%elementIdx == oldElement) then 
+      !   call fatalError(Here, 'PARTICLE LOST. Particle has geometrically moved to new element but remains in old one')
+      ! end if
+
       call coords % moveLocal(updateData % d, updateData % updateLevel)
       updateData % r = coords % getPosition(updateData % updateLevel)
 

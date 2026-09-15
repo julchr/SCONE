@@ -270,12 +270,26 @@ contains
     if (0 < data % elementIdx) then
       call self % distanceToNextFace(data)
 
+      ! if ((data%elementIdx /= 0) .and. data%leftBoundary) then 
+      !   call fatalError('distance() in mesh_inter: ', 'Particle has been lost.')
+      ! end if
+
     else
+     ! print *, '###'
+      
       ! If not, we need to check if the particle enters the mesh. If yes, update localId from index of the parent element and return.
       call self % distanceToBoundary(data)
       if (data % elementIdx == 0) data % isInside = .false.
 
+      ! if (data%intersects .and. data%elementIdx == 0) then 
+      !   call fatalError('distance() in mesh_inter: ', 'Particle has been lost.')
+      ! end if
+
+     ! print *,  data % isInside
+     ! print *, '###'
+
     end if
+
 
   end subroutine distance
 

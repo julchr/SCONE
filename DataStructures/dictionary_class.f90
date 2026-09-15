@@ -905,6 +905,7 @@ contains
     integer(shortInt)              :: idx
     character(100), parameter       :: Here='getOrDefault_real (dictionary_class.f90)'
 
+
     idx = self % search(keyword, Here, fatal =.false.)
 
     if (idx == targetNotFound) then
@@ -929,6 +930,7 @@ contains
     real(defReal), dimension(:), intent(in)                :: default
     integer(shortInt)                                    :: idx
     character(100), parameter         :: Here='getOrDefault_realArray_allocc (dictionary_class.f90)'
+
 
     idx = self % search(keyword, Here, fatal =.false.)
     if (allocated(value)) deallocate(value)
@@ -955,6 +957,7 @@ contains
     real(defReal), dimension(:), intent(in)              :: default
     integer(shortInt)                                  :: idx
     character(*), parameter :: Here = 'getOrDefault_realArray_ptr (dictionary_class.f90)'
+
 
     idx = self % search(keyword, Here, fatal =.false.)
 
@@ -984,6 +987,7 @@ contains
     integer(shortInt)              :: idx
     character(100), parameter       :: Here='getOrDefault_int (dictionary_class.f90)'
 
+
     idx = self % search(keyword, Here, fatal =.false.)
 
     if (idx == targetNotFound) then
@@ -1007,6 +1011,7 @@ contains
     integer(shortInt), dimension(:), intent(in)                :: default
     integer(shortInt)                                        :: idx
     character(100), parameter           :: Here='getOrDefault_intArray_alloc (dictionary_class.f90)'
+
 
     idx = self % search(keyword, Here, fatal =.false.)
 
@@ -1035,6 +1040,7 @@ contains
     integer(shortInt)                                       :: idx
     character(100), parameter             :: Here='getOrDefault_intArray_ptr (dictionary_class.f90)'
 
+
     idx = self % search(keyword, Here, fatal =.false.)
 
     if (associated(value)) deallocate(value)
@@ -1059,6 +1065,7 @@ contains
     integer(shortInt)               :: idx
     character(*), parameter         :: Here = 'getOrDefault_longInt (dictionary_class.f90)'
 
+
     idx = self % search(keyword, Here, fatal = .false.)
     if (idx == targetNotFound) then
       value = default
@@ -1080,6 +1087,7 @@ contains
     integer(longInt), dimension(:), intent(in)                 :: default
     integer(shortInt)                                          :: idx
     character(*), parameter                                    :: Here = 'getOrDefault_longIntArray_alloc (dictionary_class.f90)'
+
 
     idx = self % search(keyword, Here, fatal = .false.)
     if (allocated(value)) deallocate(value)
@@ -1103,6 +1111,7 @@ contains
     integer(longInt), dimension(:), intent(in)             :: default
     integer(shortInt)                                      :: idx
     character(*), parameter                                :: Here = 'getOrDefault_longIntArray_ptr (dictionary_class.f90)'
+
 
     idx = self % search(keyword, Here, fatal = .false.)
     if (associated(value)) deallocate(value)
@@ -1130,6 +1139,7 @@ contains
     integer(shortInt)              :: idx
     character(100), parameter       :: Here='getOrDefault_char (dictionary_class.f90)'
 
+
     idx = self % search(keyword, Here, fatal =.false.)
 
     if (idx == targetNotFound) then
@@ -1154,6 +1164,7 @@ contains
     character(charLen), dimension(size(default))               :: loc_Char
     integer(shortInt)                                         :: idx
     character(100), parameter           :: Here='getOrDefault_charArray_alloc(dictionary_class.f90)'
+
 
     idx = self % search(keyword, Here, fatal =.false.)
 
@@ -1182,6 +1193,7 @@ contains
     integer(shortInt)                                         :: idx
     character(100), parameter            :: Here='getOrDefault_charArray_ptr (dictionary_class.f90)'
 
+
     idx = self % search(keyword, Here, fatal =.false.)
 
     if (associated(value)) deallocate(value)
@@ -1191,6 +1203,7 @@ contains
       value = default
     else
       call self % get(value, keyword)
+      
 
     end if
   end subroutine getOrDefault_charArray_ptr
@@ -1205,6 +1218,7 @@ contains
     logical(defBool), intent(in)   :: default
     integer(shortInt)              :: idx
     character(100), parameter       :: Here='getOrDefault_bool(dictionary_class.f90)'
+
 
     idx = self % search(keyword, Here, fatal =.false.)
     if (idx == targetNotFound) then

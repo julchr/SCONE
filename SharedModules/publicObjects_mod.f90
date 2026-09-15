@@ -49,20 +49,24 @@ module publicObjects
     integer(shortInt)                     :: cellIdx = 0, elementIdx = 0, faceIdx = 0, front = 0, localId = 1, meshIdx = 0, &
                                              surfaceIdx = 0, universeIdx = 0, universeRootId = 0, updateLevel = 0
     integer(shortInt), dimension(VALENCE) :: currentFaceIdxs = 0
-    logical(defBool)                      :: isInside = .false., isRotated = .false.
+    logical(defBool)                      :: isInside = .false., isRotated = .false., leftBoundary = .false., &
+                                             enteredBoundary = .false.
     real(defReal)                         :: d = INF, dMax = ZERO
     real(defReal), dimension(3)           :: r = ZERO, u = ZERO
     real(defReal), dimension(3, 3)        :: rotationMatrix = ZERO
+    logical(defBool) :: bleh = .false.
   end type coordData
 
   !!
   !!
   !!
   type :: intersectionTestPayload
-    integer(shortInt)                     :: front = 0
+    integer(shortInt)                     :: front = 0, currentElement = 0
     integer(shortInt), dimension(VALENCE) :: currentFaceIdxs = 0
     real(defReal)                         :: dMax = ZERO
     real(defReal), dimension(3)           :: r = ZERO, u = ZERO
+    logical(defBool) :: bleh = .false.
+    logical(defBool) :: ugh = .false.
   end type intersectionTestPayload
 
   !!
@@ -79,9 +83,10 @@ module publicObjects
   !!
   !!
   type :: intersectionTestResult
-    logical(defBool) :: intersects = .false., needsRescue = .false.
+    logical(defBool) :: intersects = .false., needsRescue = .false., test = .false.
     real(defReal)    :: d = INF
     type(ratint_t)   :: d_rational
+
   end type intersectionTestResult
 
   !!
@@ -143,14 +148,18 @@ contains
   !!
   !!
   !!
-  pure function newIntersectionTestPayload(r, u, dMax) result(payload)
+  pure function newIntersectionTestPayload(r, u, dMax, currentElement, ugh) result(payload)
     real(defReal), dimension(3), intent(in) :: r, u
     real(defReal), intent(in)               :: dMax
     type(intersectionTestPayload)           :: payload
+    integer(shortInt), intent(in), optional  :: currentElement  
+    logical(defBool), intent(in), optional :: ugh
 
     payload % r = r
     payload % u = u
     payload % dMax = dMax
+    if (present(currentElement)) payload%currentElement = currentElement
+    if (present(ugh)) payload%ugh = ugh
 
   end function newIntersectionTestPayload
 

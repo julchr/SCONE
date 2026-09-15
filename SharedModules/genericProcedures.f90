@@ -1040,6 +1040,36 @@ contains
 
   end function areEqual_defReal
 
+
+  elemental function areEqualETOL(a,b) result(equal)
+    real(defReal), intent(in) :: a, b
+    logical(defBool)          :: equal
+    real(defReal)             :: absDiff
+
+    ! Initialise equal = .true. and check for perfect (to the bit) equality, since we can 
+    ! return early in this case.
+    equal = .true.
+    if (a == b) return
+
+    ! Compute the absolute value of the difference between the two floating point numbers.
+    ! Note that if a and b are both very large and of opposite signs this can cause overflow.
+    absDiff = abs(a - b)
+
+    ! Check if absDiff is less than some absolute very small tolerance first and return if yes.
+    if (absDiff < ADJ_FLOAT_TOL) return
+
+
+    if (absDiff < max(abs(a), abs(b)) * ADJ_FLOAT_TOL) return
+
+
+    equal = .false.
+
+  end function areEqualETOL
+
+
+
+
+
   !!
   !! Returns .true. if all floating point numbers in an array are equal to a given value. 
   !!

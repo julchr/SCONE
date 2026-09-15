@@ -15,12 +15,11 @@ module particlePhysicsPackage_inter
   use source_inter,                  only : source
   use sourceFactory_func,            only : new_source
   use tallyAdmin_class,              only : tallyAdmin
-  use timer_mod,                     only : timerReset, timerStart, timerStop, timerTime
+  use timer_mod
   use transportOperator_inter,       only : transportOperator
   use transportOperatorFactory_func, only : new_transportOperator
   use physicsPackage_inter,          only : init_super => init, initPhysicsPackagePayload, kill_super => kill, physicsPackage
-  use universalVariables,            only : nameWW, P_NEUTRON_CE, P_NEUTRON_MG
-
+  use universalVariables
   implicit none
   private
 
@@ -409,12 +408,16 @@ contains
     type(RNG), intent(inout)                            :: pRNG
     type(tallyAdmin), pointer, intent(inout)            :: tally
     logical(defBool), intent(in), optional              :: displayProgress
-    integer(shortInt)                                   :: i, nFinalParticles, timerMain
+    integer(shortInt)                                   :: i, nFinalParticles, timerMain, particleTimer, timings, j
+    real(defReal), dimension(POPSIZE)                        :: particlePopTimes
     logical(defBool)                                    :: display
-    real(defReal)                                       :: elapsedTime, endTime
+    real(defReal)                                       :: elapsedTime, endTime, popStart, popEnd
+    integer::thread
 
     display = .true.
     if(displayProgress) display = displayProgress
+
+    timings = 0
 
     !$omp master
     ! Prepare current cycle.
@@ -428,9 +431,21 @@ contains
     !$omp barrier
 
     geometryIdx = self % getGeometryIdx()
-  
+
+    !timerMain = self % getTimerMain()
+    
+
+    timings = timings+1
+
+    particleTimer = registerTimer('particles')
+    
+
+    call timerStart(particleTimer)
+    popStart = 0
+    !print *, nInitialParticles
     !$omp do schedule(dynamic)
     do i = 1, nInitialParticles
+      
       ! Create RNG which can be thread private.
       pRNG = self % pRNG
 
@@ -442,10 +457,31 @@ contains
 
       call self % trackParticleHistory(transOp, collOp, p, buffer, tally)
 
+
+      if (mod(i,1000) == 0) then 
+
+        call timerStop(particleTimer)
+        particlePopTimes(i/1000) = timerTime(particleTimer)
+        particleTimesTotal(i/1000) = particleTimesTotal(i/1000) + timerTime(particleTimer)
+        call timerStart(particleTimer)
+
+        currentK = currentK + 1
+        if (currentK > 1 .and. currentK < 21) then
+          do j=1, 16
+            allCounts(currentK, j) = allCounts(currentK - 1, j)
+          end do
+        end if
+
+      end if 
+      
+
     end do
     !$omp end do
+    call timerStop(particleTimer)
 
     !$omp master
+
+    
     ! Process end of cycle results.
     call self % processEndOfCycle(nFinalParticles)
     
@@ -459,6 +495,10 @@ contains
       call self % displayCycleProgress(cycleNumber, nInitialParticles, nFinalParticles, elapsedTime, endTime, &
                                        max(ZERO, endTime - elapsedTime))
       call tally % display()
+
+      do i=1,20
+        print *, 'Time for ', i*1000, ' particles: ', particlePopTimes(i)
+      end do
 
     end if
     !$omp end master
@@ -474,7 +514,7 @@ contains
     logical(defBool), intent(in), optional       :: reset
     class(physicalParticle), allocatable         :: p
     class(transportOperator), allocatable        :: transOp
-    integer(shortInt)                            :: geometryIdx, i, nInitialParticles, timerMain
+    integer(shortInt)                            :: geometryIdx, i, nInitialParticles, timerMain, j, k
     logical(defBool)                             :: resetTimer
     type(tallyAdmin), pointer                    :: tallyAdminPtr
     type(particleDungeon)                        :: buffer
@@ -511,10 +551,76 @@ contains
 
     ! Loop through all cycles.
     do i = 1, nCycles
-      call self % runCycle(i, nCycles, p, transOp, geometryIdx, nInitialParticles, collOp, buffer, pRNG, tallyAdminPtr)
+      currentK = 1
+      allCounts = 0
 
+
+      call self % runCycle(i, nCycles, p, transOp, geometryIdx, nInitialParticles, collOp, buffer, pRNG, tallyAdminPtr)
+      particleSums = particleSums + 1
+
+      do j=1, POPSIZE
+        currentCycle = j
+        print *, 'Average time for ', j*1000, ' particles: ', particleTimesTotal(j)/particleSums
+      end do
+
+
+      do j=1, 20
+        do k=1, 16
+          if (k==12 .or. k==13) then 
+            totalAllCounts(j, k) = max(totalAllCounts(j, k), allCounts(j, k)*1.0_defReal)
+            cycle 
+          end if
+          totalAllCounts(j, k) = totalAllCounts(j, k) + allCounts(j, k)
+        end do
+      end do 
+
+      do j=1, 20
+        print *, '---------------------------------------------------------------------------------'
+        print *, j*1000, ' particles: '
+
+        print *, totalAllCounts(j, :)
+
+        print *, '---------------------------------------------------------------------------------'
+      end do
+
+  
     end do
     !$omp end parallel
+
+    !! NOTE: comment kept as reference for order of output of totalAllCounts - indexes correspond to counts below (excl. ratios)
+
+    ! do j=1, 20
+    !   print *, '---------------------------------------------------------------------------------'
+    !   print *, j*1000, ' particles: '
+    !   do k=1,16
+    !     if (k == 12 .or. k==13) then 
+    !       cycle 
+    !     end if
+    !     avgCount(k) = totalAllCounts(j,k)/(currentcycle * 1.0_defReal)
+    !   end do
+    !   print *, totalAllCounts(j, :)
+    !   print *, '!!!!'
+    !   print *, 'element crossings               : ', finalCounts(1) / currentCycle
+    !   print *, 'rational element crossings      : ', finalCounts(2) / currentCycle
+    !   print *, 'Ratio of element crossings      : ', 100.0_defReal * finalCounts(2)/finalCounts(1)
+    !   print *, 'boundary crossings              : ', finalCounts(3) / currentCycle
+    !   print *, 'rational boundary crossings     : ', finalCounts(4) / currentCycle
+    !   print *, 'Ratio of boundary crossings     : ', 100.0_defReal * finalCounts(4)/finalCounts(3)
+    !   print *, 'in plane rational               : ', finalCounts(5)
+    !   print *, 'feature rational                : ', finalCounts(6)
+    !   print *, 'near start or end rational      : ', finalCounts(7)
+    !   print *, '2 tie sets                      : ', finalCounts(8)
+    !   print *, '>2 tie sets                     : ', finalCounts(9)
+    !   print *, 'inside element check            : ', finalCounts(10)
+    !   print *, 'enters through faces in element : ', finalCounts(11)
+    !   print *, 'numerator limb size             : ', finalCounts(12)
+    !   print *, 'denominator limb size           : ', finalCounts(13)
+    !   print *, 'bbox place1                     : ', finalCounts(14)
+    !   print *, 'bbox place2                     : ', finalCounts(15)
+    !   print *, 'bbox total entry                : ', finalCounts(16)
+    !   print *, '!!!!'
+    !   print *, '---------------------------------------------------------------------------------'
+    ! end do
 
   end subroutine runCycles
 

@@ -15,6 +15,7 @@ program scone
   use physicsPackageFactory_func, only : new_physicsPackage
   use timer_mod,                  only : killTimer, registerTimer, secToChar, timerStart, timerStop, timerTime
   use visualiser_class,           only : visualiser
+  use universalVariables
 
   implicit none
 
@@ -92,6 +93,26 @@ program scone
   call timerStop(timerIdx)
   print *, 'Total calculation time: '//trim(secToChar(timerTime(timerIdx)))//'.'
   print *, 'Have a good day and enjoy your results analysis!'
+
+
+  print *, 'Number of element crossings ', nElementCrossings
+  print *, 'Number of rational element crossings ', nElementCrossings_rational
+  print *, 'Ratio of element crossings ', 100.0_defReal * nElementCrossings_rational/nElementCrossings
+  print *, 'Number of boundary crossings ', nBoundaryCrossings
+  print *, 'Number of rational boundary crossings ', nBoundaryCrossings_rational
+  print *, 'Ratio of boundary crossings ', 100.0_defReal * nBoundaryCrossings_rational/nBoundaryCrossings
+  print *, 'Num sz 2 tie sets ', nTieSet1
+  print *, 'Num sz >2 tie sets ', nTieSet2
+  print *, 'Num in plane rational calls ', nInplane
+  print *, 'Num near feature rational calls ', nNearFeature
+  print *, 'Num near start or end rational calls ', nStartEnd
+  print *, 'Num escalations for inside element check ', nisInsideElem
+  print *, 'Num escalations for enters through faces in element ', nEntersFaces
+  print *, 'Maximum lambda numerator limb size growth ', maxLambdaLimbSizeNum
+  print *, 'Maximum lambda denominator limb size growth ', maxLambdaLimbSizeDen
+  print *, 'num axis asligned bbox place1 ', nAxis1
+  print *, 'num axis asligned bbox place2 ', nAxis2
+  print *, 'num axis asligned bbox total entry ', nAxisT
 
   ! Clean up.
   if (allocated(core)) then
